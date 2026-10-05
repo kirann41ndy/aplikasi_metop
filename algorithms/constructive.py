@@ -356,14 +356,11 @@ def farthest_insertion(distance_matrix, start_node):
     }
 
 
-# =========================================================
 # Arbitrary Insertion
-# =========================================================
+def arbitrary_insertion(dist_matrix, start=0, seed=None):
+    n = len(dist_matrix)
 
-def arbitrary_insertion(distance_matrix, start_node, seed=None):
-    n = len(distance_matrix)
-
-    validate_start_node(start_node, n)
+    validate_start_node(start, n)
 
     rng = random.Random(seed)
 
@@ -371,26 +368,40 @@ def arbitrary_insertion(distance_matrix, start_node, seed=None):
     candidates = [
         node
         for node in range(n)
-        if node != start_node
+        if node != start
     ]
 
     second_node = rng.choice(candidates)
 
     # Initial closed tour
     route = [
-        start_node,
+        start,
         second_node,
-        start_node
+        start
     ]
 
     unvisited = (
         set(range(n))
-        - {start_node, second_node}
+        - {start, second_node}
     )
+
+    history = []
+
+    # Initial state
+    distance = tour_distance(route, dist_matrix)
+
+    history.append({
+        "iteration": 0,
+        "route": route.copy(),
+        "distance": distance
+    })
+
+    iteration = 0
 
     while unvisited:
 
         # Pilih node unvisited secara acak
+        # (sorted agar hasil reproducible dengan seed)
         selected_node = rng.choice(
             sorted(unvisited)
         )
@@ -406,9 +417,9 @@ def arbitrary_insertion(distance_matrix, start_node, seed=None):
             node_j = route[i + 1]
 
             increase = (
-                distance_matrix[node_i][selected_node]
-                + distance_matrix[selected_node][node_j]
-                - distance_matrix[node_i][node_j]
+                dist_matrix[node_i][selected_node]
+                + dist_matrix[selected_node][node_j]
+                - dist_matrix[node_i][node_j]
             )
 
             if (
@@ -431,9 +442,18 @@ def arbitrary_insertion(distance_matrix, start_node, seed=None):
 
         unvisited.remove(selected_node)
 
-    total_distance = tour_distance(
-        route,
-        distance_matrix
-    )
+        iteration += 1
 
-    return route, total_distance
+        distance = tour_distance(route, dist_matrix)
+
+        history.append({
+            "iteration": iteration,
+            "route": route.copy(),
+            "distance": distance
+        })
+
+    return {
+        "route": route,
+        "distance": distance,
+        "history": history
+    }
