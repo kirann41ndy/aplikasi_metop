@@ -6,8 +6,7 @@ import time
 from algorithms.base import (
     build_distance_matrix,
     tour_distance,
-    generate_initial_tour,
-    validate_tour
+    generate_initial_tour
 )
 
 from algorithms.constructive import (
@@ -61,7 +60,7 @@ st.set_page_config(
 
 
 # ============================================================
-# ALGORITHM INFORMATION
+# ALGORITHM CONFIGURATION
 # ============================================================
 
 ALGORITHMS = {
@@ -72,41 +71,41 @@ ALGORITHMS = {
 
     "Nearest Neighbor": {
         "type": "Constructive",
+        "needs_start_node": True,
+        "needs_initial_route": False,
         "function": nearest_neighbor,
         "description":
             "Membangun rute dengan memilih node terdekat secara bertahap.",
-        "needs_home": True,
-        "needs_initial_route": False,
         "parameters": {}
     },
 
     "Nearest Insertion": {
         "type": "Constructive",
+        "needs_start_node": True,
+        "needs_initial_route": False,
         "function": nearest_insertion,
         "description":
             "Membangun rute dengan menyisipkan node pada posisi terbaik.",
-        "needs_home": True,
-        "needs_initial_route": False,
         "parameters": {}
     },
 
     "Farthest Insertion": {
         "type": "Constructive",
+        "needs_start_node": True,
+        "needs_initial_route": False,
         "function": farthest_insertion,
         "description":
             "Membangun rute dengan memprioritaskan node yang paling jauh.",
-        "needs_home": True,
-        "needs_initial_route": False,
         "parameters": {}
     },
 
     "Arbitrary Insertion": {
         "type": "Constructive",
+        "needs_start_node": True,
+        "needs_initial_route": False,
         "function": arbitrary_insertion,
         "description":
             "Memilih node secara acak lalu menyisipkannya pada posisi terbaik.",
-        "needs_home": True,
-        "needs_initial_route": False,
         "parameters": {
             "seed": {
                 "type": "int",
@@ -114,7 +113,7 @@ ALGORITHMS = {
                 "min": 0,
                 "max": 99999,
                 "step": 1,
-                "description":
+                "help":
                     "Seed untuk mengontrol proses acak."
             }
         }
@@ -127,11 +126,11 @@ ALGORITHMS = {
 
     "2-opt": {
         "type": "Local Search",
+        "needs_start_node": False,
+        "needs_initial_route": True,
         "function": two_opt,
         "description":
             "Memperbaiki rute dengan membalik segmen rute.",
-        "needs_home": False,
-        "needs_initial_route": True,
         "parameters": {
             "max_iter": {
                 "type": "int",
@@ -139,26 +138,26 @@ ALGORITHMS = {
                 "min": 1,
                 "max": 10000,
                 "step": 1,
-                "description":
+                "help":
                     "Batas maksimum iterasi pencarian."
             },
             "strategy": {
                 "type": "select",
                 "options": ["best", "first"],
                 "default": "best",
-                "description":
-                    "Best mencari perbaikan terbaik; First mengambil perbaikan pertama."
+                "help":
+                    "Best memilih perbaikan terbaik, sedangkan First memilih perbaikan pertama."
             }
         }
     },
 
     "3-opt": {
         "type": "Local Search",
+        "needs_start_node": False,
+        "needs_initial_route": True,
         "function": three_opt,
         "description":
             "Memperbaiki rute dengan mengevaluasi perubahan 3-opt.",
-        "needs_home": False,
-        "needs_initial_route": True,
         "parameters": {
             "max_iter": {
                 "type": "int",
@@ -166,15 +165,15 @@ ALGORITHMS = {
                 "min": 1,
                 "max": 10000,
                 "step": 1,
-                "description":
+                "help":
                     "Batas maksimum iterasi pencarian."
             },
             "strategy": {
                 "type": "select",
                 "options": ["best", "first"],
                 "default": "best",
-                "description":
-                    "Best mencari perbaikan terbaik; First mengambil perbaikan pertama."
+                "help":
+                    "Best memilih perbaikan terbaik, sedangkan First memilih perbaikan pertama."
             }
         }
     },
@@ -186,11 +185,11 @@ ALGORITHMS = {
 
     "Simulated Annealing": {
         "type": "Metaheuristic",
+        "needs_start_node": False,
+        "needs_initial_route": True,
         "function": simulated_annealing,
         "description":
-            "Mencari solusi dengan menerima beberapa solusi lebih buruk secara probabilistik.",
-        "needs_home": False,
-        "needs_initial_route": True,
+            "Mencari solusi dengan menerima beberapa solusi yang lebih buruk secara probabilistik.",
         "parameters": {
             "initial_temp": {
                 "type": "float",
@@ -198,8 +197,8 @@ ALGORITHMS = {
                 "min": 0.01,
                 "max": 100000.0,
                 "step": 10.0,
-                "description":
-                    "Suhu awal pencarian."
+                "help":
+                    "Suhu awal proses pencarian."
             },
             "cooling_rate": {
                 "type": "float",
@@ -207,8 +206,8 @@ ALGORITHMS = {
                 "min": 0.01,
                 "max": 0.999,
                 "step": 0.01,
-                "description":
-                    "Laju penurunan suhu setiap iterasi."
+                "help":
+                    "Seberapa cepat suhu diturunkan."
             },
             "min_temp": {
                 "type": "float",
@@ -216,7 +215,7 @@ ALGORITHMS = {
                 "min": 0.0001,
                 "max": 100.0,
                 "step": 0.01,
-                "description":
+                "help":
                     "Suhu minimum sebelum pencarian berhenti."
             },
             "max_iter": {
@@ -225,7 +224,7 @@ ALGORITHMS = {
                 "min": 1,
                 "max": 10000,
                 "step": 1,
-                "description":
+                "help":
                     "Batas maksimum iterasi."
             },
             "seed": {
@@ -234,25 +233,26 @@ ALGORITHMS = {
                 "min": 0,
                 "max": 99999,
                 "step": 1,
-                "description":
-                    "Seed untuk menjaga hasil acak tetap konsisten."
+                "help":
+                    "Seed untuk menjaga proses acak tetap konsisten."
             },
             "verbose_history": {
                 "type": "bool",
                 "default": False,
-                "description":
-                    "Menyimpan informasi history tambahan."
+                "help":
+                    "Menyimpan history proses pencarian."
             }
         }
     },
 
+
     "Tabu Search": {
         "type": "Metaheuristic",
+        "needs_start_node": False,
+        "needs_initial_route": True,
         "function": tabu_search,
         "description":
-            "Mencari solusi dengan menyimpan perpindahan sebelumnya dalam tabu list.",
-        "needs_home": False,
-        "needs_initial_route": True,
+            "Mencari solusi dengan menggunakan tabu list untuk menghindari perpindahan yang sama.",
         "parameters": {
             "max_iter": {
                 "type": "int",
@@ -260,7 +260,7 @@ ALGORITHMS = {
                 "min": 1,
                 "max": 10000,
                 "step": 1,
-                "description":
+                "help":
                     "Batas maksimum iterasi."
             },
             "tabu_tenure": {
@@ -269,34 +269,18 @@ ALGORITHMS = {
                 "min": 1,
                 "max": 100,
                 "step": 1,
-                "description":
-                    "Lama perpindahan berada dalam tabu list."
+                "help":
+                    "Lama perpindahan disimpan dalam tabu list."
             },
             "verbose_history": {
                 "type": "bool",
                 "default": False,
-                "description":
-                    "Menyimpan informasi history tambahan."
+                "help":
+                    "Menyimpan history proses pencarian."
             }
         }
     }
 }
-
-
-CONSTRUCTIVE = [
-    name for name, info in ALGORITHMS.items()
-    if info["type"] == "Constructive"
-]
-
-LOCAL_SEARCH = [
-    name for name, info in ALGORITHMS.items()
-    if info["type"] == "Local Search"
-]
-
-METAHEURISTIC = [
-    name for name, info in ALGORITHMS.items()
-    if info["type"] == "Metaheuristic"
-]
 
 
 # ============================================================
@@ -308,16 +292,6 @@ if "df" not in st.session_state:
 
 if "independent_results" not in st.session_state:
     st.session_state.independent_results = []
-
-if "hybrid_results" not in st.session_state:
-    st.session_state.hybrid_results = []
-
-if "manual_data" not in st.session_state:
-    st.session_state.manual_data = pd.DataFrame({
-        "node": ["A", "B", "C", "D", "E", "F"],
-        "x": [10, 60, 90, 70, 30, 20],
-        "y": [20, 80, 40, 50, 90, 10]
-    })
 
 
 # ============================================================
@@ -335,19 +309,6 @@ def route_to_labels(df, route):
     )
 
 
-def normalize_route(route, n):
-
-    if route is None:
-        return None
-
-    route = list(route)
-
-    if len(route) == n:
-        route.append(route[0])
-
-    return route
-
-
 def extract_route(result):
 
     if isinstance(result, dict):
@@ -363,42 +324,15 @@ def extract_route(result):
 
     if isinstance(result, tuple):
 
-        if len(result) > 0:
-            if isinstance(result[0], (list, tuple)):
-                return list(result[0])
+        for value in result:
+
+            if isinstance(value, (list, tuple)):
+                return list(value)
 
     if isinstance(result, (list, tuple)):
         return list(result)
 
     return None
-
-
-def extract_distance(result, route, dist_matrix):
-
-    if isinstance(result, dict):
-
-        for key in [
-            "distance",
-            "best_distance",
-            "final_distance"
-        ]:
-            if key in result:
-                try:
-                    return float(result[key])
-                except:
-                    pass
-
-    if isinstance(result, tuple):
-
-        for value in result[1:]:
-
-            if isinstance(value, (int, float)):
-                return float(value)
-
-    if route is not None:
-        return tour_distance(route, dist_matrix)
-
-    return float("inf")
 
 
 def extract_history(result):
@@ -418,108 +352,51 @@ def extract_history(result):
     return None
 
 
-def render_parameters(method_name, key_prefix):
-
-    params = {}
-
-    configs = ALGORITHMS[method_name]["parameters"]
-
-    for name, config in configs.items():
-
-        st.caption(
-            f"**{name.replace('_', ' ').title()}** — "
-            f"{config['description']}"
-        )
-
-        widget_key = f"{key_prefix}_{method_name}_{name}"
-
-        if config["type"] == "int":
-
-            params[name] = st.number_input(
-                name.replace("_", " ").title(),
-                min_value=config["min"],
-                max_value=config["max"],
-                value=config["default"],
-                step=config["step"],
-                key=widget_key
-            )
-
-        elif config["type"] == "float":
-
-            params[name] = st.number_input(
-                name.replace("_", " ").title(),
-                min_value=config["min"],
-                max_value=config["max"],
-                value=config["default"],
-                step=config["step"],
-                key=widget_key
-            )
-
-        elif config["type"] == "select":
-
-            params[name] = st.selectbox(
-                name.replace("_", " ").title(),
-                config["options"],
-                index=config["options"].index(
-                    config["default"]
-                ),
-                key=widget_key
-            )
-
-        elif config["type"] == "bool":
-
-            params[name] = st.checkbox(
-                name.replace("_", " ").title(),
-                value=config["default"],
-                key=widget_key
-            )
-
-    return params
-
+# ============================================================
+# RUN ALGORITHM
+# ============================================================
 
 def run_algorithm(
-    method_name,
+    method,
     dist_matrix,
+    start_node=None,
     initial_route=None,
-    home=None,
     parameters=None
 ):
 
     parameters = parameters or {}
 
-    function = ALGORITHMS[method_name]["function"]
-
     # --------------------------------------------------------
     # CONSTRUCTIVE
     # --------------------------------------------------------
 
-    if method_name == "Nearest Neighbor":
+    if method == "Nearest Neighbor":
 
-        return function(
+        return nearest_neighbor(
             dist_matrix,
-            start_node=home
+            start_node
         )
 
-    if method_name == "Nearest Insertion":
+    elif method == "Nearest Insertion":
 
-        return function(
+        return nearest_insertion(
             dist_matrix,
-            start_node=home
+            start_node
         )
 
-    if method_name == "Farthest Insertion":
+    elif method == "Farthest Insertion":
 
-        return function(
+        return farthest_insertion(
             dist_matrix,
-            start_node=home
+            start_node
         )
 
-    if method_name == "Arbitrary Insertion":
+    elif method == "Arbitrary Insertion":
 
-        return function(
+        return arbitrary_insertion(
             dist_matrix,
-            start_node=home,
-            **parameters
+            start_node,
+            seed=parameters.get("seed")
         )
 
 
@@ -527,120 +404,128 @@ def run_algorithm(
     # LOCAL SEARCH
     # --------------------------------------------------------
 
-    if method_name == "2-opt":
+    elif method == "2-opt":
 
-        return function(
-            initial_route=initial_route,
-            dist_matrix=dist_matrix,
-            **parameters
+        return two_opt(
+            initial_route,
+            dist_matrix,
+            max_iter=parameters.get("max_iter", 100),
+            strategy=parameters.get("strategy", "best")
         )
 
-    if method_name == "3-opt":
+    elif method == "3-opt":
 
-        return function(
-            initial_route=initial_route,
-            dist_matrix=dist_matrix,
-            **parameters
+        return three_opt(
+            initial_route,
+            dist_matrix,
+            max_iter=parameters.get("max_iter", 100),
+            strategy=parameters.get("strategy", "best")
         )
 
 
     # --------------------------------------------------------
-    # METAHEURISTIC
+    # SIMULATED ANNEALING
     # --------------------------------------------------------
 
-    if method_name == "Simulated Annealing":
+    elif method == "Simulated Annealing":
 
-        return function(
-            dist_matrix=dist_matrix,
+        return simulated_annealing(
+            dist_matrix,
             initial_tour=initial_route,
-            **parameters
+            initial_temp=parameters.get(
+                "initial_temp",
+                1000.0
+            ),
+            cooling_rate=parameters.get(
+                "cooling_rate",
+                0.95
+            ),
+            min_temp=parameters.get(
+                "min_temp",
+                0.01
+            ),
+            max_iter=parameters.get(
+                "max_iter",
+                10
+            ),
+            seed=parameters.get(
+                "seed",
+                42
+            ),
+            verbose_history=parameters.get(
+                "verbose_history",
+                False
+            )
         )
 
-    if method_name == "Tabu Search":
 
-        return function(
-            initial_route=initial_route,
-            dist_matrix=dist_matrix,
-            **parameters
+    # --------------------------------------------------------
+    # TABU SEARCH
+    # --------------------------------------------------------
+
+    elif method == "Tabu Search":
+
+        return tabu_search(
+            initial_route,
+            dist_matrix,
+            max_iter=parameters.get(
+                "max_iter",
+                100
+            ),
+            tabu_tenure=parameters.get(
+                "tabu_tenure",
+                3
+            ),
+            verbose_history=parameters.get(
+                "verbose_history",
+                False
+            )
         )
 
-    raise ValueError(
-        f"Algoritma {method_name} belum didukung."
-    )
+    else:
 
-
-def make_initial_route(df, mode, home_index, seed):
-
-    if mode == "Generate Random":
-
-        return generate_initial_tour(
-            len(df),
-            home=home_index,
-            seed=int(seed)
+        raise ValueError(
+            f"Algoritma '{method}' tidak ditemukan."
         )
 
-    return None
 
+# ============================================================
+# RUN ONE INDEPENDENT ALGORITHM
+# ============================================================
 
-def make_manual_route(df, home_index, order):
-
-    if order is None:
-        return None
-
-    if len(order) != len(df) - 1:
-        return None
-
-    route = [home_index]
-
-    for node in order:
-
-        idx = df.index[
-            df["node"] == node
-        ][0]
-
-        route.append(int(idx))
-
-    route.append(home_index)
-
-    return route
-
-
-def run_one(
-    method_name,
+def execute_independent_algorithm(
+    method,
     df,
     dist_matrix,
-    home_index=None,
+    start_node=None,
     initial_route=None,
     parameters=None
 ):
 
-    start = time.perf_counter()
+    start_time = time.perf_counter()
 
     result = run_algorithm(
-        method_name=method_name,
+        method=method,
         dist_matrix=dist_matrix,
+        start_node=start_node,
         initial_route=initial_route,
-        home=home_index,
         parameters=parameters
     )
 
-    elapsed = time.perf_counter() - start
+    execution_time = (
+        time.perf_counter()
+        - start_time
+    )
 
     route = extract_route(result)
 
-    route = normalize_route(
-        route,
-        len(df)
-    )
-
-    distance = extract_distance(
-        result,
+    final_distance = tour_distance(
         route,
         dist_matrix
     )
 
-    history = extract_history(result)
-
+    # Initial distance hanya relevan
+    # untuk Local Search / Metaheuristic.
     if initial_route is not None:
 
         initial_distance = tour_distance(
@@ -653,13 +538,13 @@ def run_one(
         initial_distance = None
 
     return {
-        "method": method_name,
+        "method": method,
         "route": route,
         "initial_route": initial_route,
         "initial_distance": initial_distance,
-        "final_distance": distance,
-        "execution_time": elapsed,
-        "history": history
+        "final_distance": final_distance,
+        "execution_time": execution_time,
+        "history": extract_history(result)
     }
 
 
@@ -670,64 +555,60 @@ def run_one(
 st.title("🧭 TSP Learning & Optimization")
 
 st.caption(
-    "Pelajari, jalankan, dan bandingkan metode "
+    "Pelajari, jalankan, dan bandingkan algoritma "
     "Travelling Salesman Problem."
 )
 
 
 # ============================================================
-# MODE
+# INPUT DATA
 # ============================================================
 
-tab_independent, tab_hybrid = st.tabs([
-    "Independent",
-    "Hybrid"
-])
-
-
-# ============================================================
-# DATASET
-# ============================================================
-
-st.header("📂 Dataset")
+st.header("📂 Input Data")
 
 input_type = st.radio(
-    "Input dataset:",
+    "Pilih sumber data:",
     ["Generate", "Upload", "Manual"],
     horizontal=True
 )
 
+
 new_data = None
 
 
+# ------------------------------------------------------------
+# GENERATE
+# ------------------------------------------------------------
+
 if input_type == "Generate":
 
-    c1, c2, c3, c4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
 
-    n_nodes = c1.number_input(
-        "Jumlah node",
-        min_value=3,
-        max_value=500,
-        value=10
-    )
+    with col1:
 
-    dataset_seed = c2.number_input(
-        "Seed",
-        min_value=0,
-        value=42
-    )
+        n_nodes = st.number_input(
+            "Jumlah node",
+            min_value=3,
+            max_value=500,
+            value=10
+        )
 
-    max_x = c3.number_input(
-        "Maksimum X",
-        min_value=1,
-        value=100
-    )
+    with col2:
 
-    max_y = c4.number_input(
-        "Maksimum Y",
-        min_value=1,
-        value=100
-    )
+        data_seed = st.number_input(
+            "Seed",
+            min_value=0,
+            value=42
+        )
+
+    with col3:
+
+        coordinate_range = st.number_input(
+            "Coordinate Range",
+            min_value=1,
+            value=100
+        )
+
 
     if st.button(
         "Generate Dataset",
@@ -735,7 +616,7 @@ if input_type == "Generate":
     ):
 
         rng = random.Random(
-            int(dataset_seed)
+            int(data_seed)
         )
 
         new_data = pd.DataFrame({
@@ -744,57 +625,97 @@ if input_type == "Generate":
                 chr(65 + i)
                 if i < 26
                 else f"N{i + 1}"
-                for i in range(int(n_nodes))
+                for i in range(
+                    int(n_nodes)
+                )
             ],
 
             "x": [
                 round(
-                    rng.uniform(0, max_x),
+                    rng.uniform(
+                        0,
+                        coordinate_range
+                    ),
                     2
                 )
-                for _ in range(int(n_nodes))
+                for _ in range(
+                    int(n_nodes)
+                )
             ],
 
             "y": [
                 round(
-                    rng.uniform(0, max_y),
+                    rng.uniform(
+                        0,
+                        coordinate_range
+                    ),
                     2
                 )
-                for _ in range(int(n_nodes))
+                for _ in range(
+                    int(n_nodes)
+                )
             ]
         })
 
 
+# ------------------------------------------------------------
+# UPLOAD
+# ------------------------------------------------------------
+
 elif input_type == "Upload":
 
-    uploaded = st.file_uploader(
+    uploaded_file = st.file_uploader(
         "Upload CSV / Excel",
-        type=["csv", "xlsx", "xls"]
+        type=[
+            "csv",
+            "xlsx",
+            "xls"
+        ]
     )
 
-    if uploaded is not None:
+    if uploaded_file is not None:
 
         if st.button(
             "Gunakan Dataset",
             type="primary"
         ):
-            new_data = uploaded
 
+            new_data = uploaded_file
+
+
+# ------------------------------------------------------------
+# MANUAL
+# ------------------------------------------------------------
 
 else:
 
-    edited = st.data_editor(
+    if "manual_data" not in st.session_state:
+
+        st.session_state.manual_data = pd.DataFrame({
+            "node": ["A", "B", "C", "D", "E"],
+            "x": [10, 50, 90, 70, 30],
+            "y": [20, 80, 40, 60, 90]
+        })
+
+
+    edited_data = st.data_editor(
         st.session_state.manual_data,
         num_rows="dynamic",
         use_container_width=True
     )
 
+
     if st.button(
         "Gunakan Dataset",
         type="primary"
     ):
-        new_data = edited
 
+        new_data = edited_data
+
+
+# ============================================================
+# LOAD DATA
+# ============================================================
 
 if new_data is not None:
 
@@ -805,7 +726,6 @@ if new_data is not None:
         )
 
         st.session_state.independent_results = []
-        st.session_state.hybrid_results = []
 
         st.success(
             "Dataset berhasil digunakan."
@@ -820,9 +740,7 @@ if new_data is not None:
         )
 
 
-# ============================================================
-# IF DATA EXISTS
-# ============================================================
+# Stop kalau belum ada data
 
 if st.session_state.df is None:
 
@@ -835,6 +753,65 @@ if st.session_state.df is None:
 
 df = st.session_state.df
 
+
+# ============================================================
+# VIEW DATA
+# ============================================================
+
+st.divider()
+
+st.header("📊 Data & Visualization")
+
+col1, col2 = st.columns(2)
+
+
+with col1:
+
+    st.subheader("Dataset")
+
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+with col2:
+
+    st.subheader("Node Distribution")
+
+    fig_nodes = plot_nodes(
+        df
+    )
+
+    st.plotly_chart(
+        fig_nodes,
+        use_container_width=True
+    )
+
+
+# ============================================================
+# DISTANCE METHOD
+# ============================================================
+
+st.divider()
+
+st.header("📐 Distance Matrix")
+
+distance_method = st.radio(
+    "Distance Method",
+    ["Euclidean", "Manhattan"],
+    horizontal=True
+)
+
+
+distance_metric = (
+    "euclidean"
+    if distance_method == "Euclidean"
+    else "manhattan"
+)
+
+
 coords = list(
     zip(
         df["x"],
@@ -843,173 +820,245 @@ coords = list(
 )
 
 
+dist_matrix = build_distance_matrix(
+    coords,
+    metric=distance_metric
+)
+
+
+with st.expander(
+    "View Distance Matrix"
+):
+
+    st.dataframe(
+        pd.DataFrame(
+            dist_matrix,
+            index=df["node"],
+            columns=df["node"]
+        ),
+        use_container_width=True
+    )
+
+
 # ============================================================
-# SIDEBAR
+# MAIN MODE
+# ============================================================
+
+st.divider()
+
+tab_independent, tab_hybrid = st.tabs([
+    "Independent",
+    "Hybrid"
+])
+
+
+# ============================================================
+# INDEPENDENT SIDEBAR
 # ============================================================
 
 with st.sidebar:
 
-    st.header("⚙️ Pengaturan")
-
-    metric = st.radio(
-        "Distance Method",
-        ["Euclidean", "Manhattan"]
-    )
-
-    metric_key = metric.lower()
+    st.header("Independent")
 
     st.divider()
 
+    # --------------------------------------------------------
+    # ALGORITHM
+    # --------------------------------------------------------
 
-# ============================================================
-# INDEPENDENT
-# ============================================================
+    st.subheader("Algorithm")
 
-with tab_independent:
+    selected_algorithms = st.multiselect(
+        "Pilih satu atau beberapa algoritma:",
+        list(ALGORITHMS.keys()),
+        key="independent_algorithm_selection"
+    )
 
-    with st.sidebar:
 
-        st.subheader("Algorithm Options")
+    # --------------------------------------------------------
+    # INITIAL SOLUTION
+    # --------------------------------------------------------
 
-        selected_independent = st.multiselect(
-            "Select algorithm(s):",
-            list(ALGORITHMS.keys()),
-            key="independent_algorithms"
-        )
+    has_constructive = any(
+        ALGORITHMS[method]["needs_start_node"]
+        for method in selected_algorithms
+    )
 
+    has_route_algorithm = any(
+        ALGORITHMS[method]["needs_initial_route"]
+        for method in selected_algorithms
+    )
+
+
+    if has_constructive or has_route_algorithm:
 
         st.divider()
 
-        st.subheader("Initial Solution")
-
-        has_constructive = any(
-            ALGORITHMS[m]["needs_home"]
-            for m in selected_independent
-        )
-
-        has_initial_route = any(
-            ALGORITHMS[m]["needs_initial_route"]
-            for m in selected_independent
+        st.subheader(
+            "Initial Solution"
         )
 
 
-        # ----------------------------------------------------
-        # HOME
-        # ----------------------------------------------------
+    # --------------------------------------------------------
+    # START NODE
+    # --------------------------------------------------------
 
-        home_index = 0
+    start_node = None
 
-        if has_constructive:
+    if has_constructive:
 
-            st.markdown(
-                "Node awal / Home"
-            )
-
-            home_label = st.selectbox(
-                "Pilih node awal:",
-                df["node"].tolist(),
-                key="independent_home"
-            )
-
-            home_index = int(
-                df.index[
-                    df["node"] == home_label
-                ][0]
-            )
-
-            st.caption(
+        st.selectbox(
+            "Start Node",
+            df["node"].tolist(),
+            key="independent_start_node",
+            help=(
                 "Digunakan oleh metode Constructive "
                 "untuk menentukan node awal."
             )
+        )
+
+        start_node_label = st.session_state[
+            "independent_start_node"
+        ]
+
+        start_node = int(
+            df.index[
+                df["node"] == start_node_label
+            ][0]
+        )
 
 
-        # ----------------------------------------------------
-        # INITIAL ROUTE
-        # ----------------------------------------------------
+    # --------------------------------------------------------
+    # STARTING ROUTE
+    # --------------------------------------------------------
 
-        initial_route = None
+    initial_route = None
 
-        if has_initial_route:
+    if has_route_algorithm:
 
-            st.markdown(
-                "Starting Route"
-            )
-
-            st.caption(
+        st.selectbox(
+            "Starting Route",
+            [
+                "Generate Random",
+                "Manual"
+            ],
+            key="independent_route_type",
+            help=(
                 "Local Search dan Metaheuristic "
                 "membutuhkan satu rute sebagai solusi awal."
             )
+        )
 
-            route_mode = st.radio(
-                "Sumber initial route:",
-                ["Generate Random", "Pilih manual"],
-                horizontal=True,
-                key="independent_route_mode"
+        route_type = st.session_state[
+            "independent_route_type"
+        ]
+
+
+        # ----------------------------------------------------
+        # RANDOM ROUTE
+        # ----------------------------------------------------
+
+        if route_type == "Generate Random":
+
+            seed = st.number_input(
+                "Seed",
+                min_value=0,
+                max_value=99999,
+                value=42,
+                step=1,
+                key="independent_initial_seed"
+            )
+
+            initial_route = generate_initial_tour(
+                len(df),
+                home=0,
+                seed=int(seed)
             )
 
 
-            if route_mode == "Generate Random":
+        # ----------------------------------------------------
+        # MANUAL ROUTE
+        # ----------------------------------------------------
 
-                seed = st.number_input(
-                    "Seed",
-                    min_value=0,
-                    max_value=99999,
-                    value=42,
-                    step=1,
-                    key="independent_route_seed"
-                )
+        else:
 
-                # Home internal hanya digunakan
-                # untuk membentuk closed tour.
-                initial_route = generate_initial_tour(
-                    len(df),
-                    home=(
-                        home_index
-                        if has_constructive
-                        else 0
-                    ),
-                    seed=int(seed)
-                )
+            st.caption(
+                "Tentukan urutan node setelah node pertama."
+            )
 
+            route_start = st.selectbox(
+                "Route Start",
+                df["node"].tolist(),
+                key="independent_route_start"
+            )
 
-            else:
+            route_start_index = int(
+                df.index[
+                    df["node"] == route_start
+                ][0]
+            )
 
-                route_home = (
-                    home_index
-                    if has_constructive
-                    else 0
-                )
+            remaining_nodes = [
+                node
+                for node in df["node"].tolist()
+                if node != route_start
+            ]
 
-                remaining = [
-                    node
-                    for node in df["node"].tolist()
-                    if node != df.iloc[route_home]["node"]
+            route_order = st.multiselect(
+                "Node Order",
+                remaining_nodes,
+                key="independent_route_order"
+            )
+
+            if len(route_order) == len(remaining_nodes):
+
+                initial_route = [
+                    route_start_index
                 ]
 
-                order = st.multiselect(
-                    "Urutan node:",
-                    remaining,
-                    key="independent_manual_route"
+                for node in route_order:
+
+                    initial_route.append(
+                        int(
+                            df.index[
+                                df["node"] == node
+                            ][0]
+                        )
+                    )
+
+                initial_route.append(
+                    route_start_index
                 )
 
-                if len(order) == len(remaining):
 
-                    initial_route = make_manual_route(
-                        df,
-                        route_home,
-                        order
-                    )
+    # --------------------------------------------------------
+    # WHEN DIFFERENT ALGORITHMS NEED DIFFERENT INPUT
+    # --------------------------------------------------------
 
-                else:
+    if (
+        has_constructive
+        and has_route_algorithm
+    ):
 
-                    st.caption(
-                        "Pilih semua node untuk membentuk rute."
-                    )
+        st.caption(
+            "Start Node digunakan oleh Constructive, "
+            "sedangkan Starting Route digunakan oleh "
+            "Local Search dan Metaheuristic."
+        )
 
 
-        # ----------------------------------------------------
-        # PARAMETERS
-        # ----------------------------------------------------
+    # --------------------------------------------------------
+    # ALGORITHM PARAMETERS
+    # --------------------------------------------------------
+
+    algorithms_with_parameters = [
+        method
+        for method in selected_algorithms
+        if ALGORITHMS[method]["parameters"]
+    ]
+
+
+    if algorithms_with_parameters:
 
         st.divider()
 
@@ -1017,191 +1066,294 @@ with tab_independent:
             "Algorithm Parameters"
         )
 
-        independent_params = {}
 
-        for method in selected_independent:
+        algorithm_parameters = {}
 
-            with st.expander(
-                method
+
+        for method in algorithms_with_parameters:
+
+            st.markdown(
+                f"**{method}**"
+            )
+
+            algorithm_parameters[method] = {}
+
+
+            for parameter, config in (
+                ALGORITHMS[method]["parameters"].items()
             ):
 
-                st.caption(
-                    ALGORITHMS[method]["description"]
-                )
+                label = parameter.replace(
+                    "_",
+                    " "
+                ).title()
 
-                independent_params[method] = (
-                    render_parameters(
-                        method,
-                        "independent"
+
+                if config["type"] == "int":
+
+                    value = st.number_input(
+                        label,
+                        min_value=config["min"],
+                        max_value=config["max"],
+                        value=config["default"],
+                        step=config["step"],
+                        key=(
+                            f"independent_"
+                            f"{method}_"
+                            f"{parameter}"
+                        ),
+                        help=config["help"]
                     )
-                )
 
 
-    # ========================================================
-    # DATASET VIEW
-    # ========================================================
+                elif config["type"] == "float":
 
-    st.subheader("Dataset")
+                    value = st.number_input(
+                        label,
+                        min_value=config["min"],
+                        max_value=config["max"],
+                        value=config["default"],
+                        step=config["step"],
+                        key=(
+                            f"independent_"
+                            f"{method}_"
+                            f"{parameter}"
+                        ),
+                        help=config["help"]
+                    )
 
-    c1, c2 = st.columns(2)
 
-    with c1:
+                elif config["type"] == "select":
 
-        st.dataframe(
-            df,
-            use_container_width=True,
-            hide_index=True
-        )
+                    value = st.selectbox(
+                        label,
+                        config["options"],
+                        index=config["options"].index(
+                            config["default"]
+                        ),
+                        key=(
+                            f"independent_"
+                            f"{method}_"
+                            f"{parameter}"
+                        ),
+                        help=config["help"]
+                    )
 
-    dist_matrix = build_distance_matrix(
-        coords,
-        metric=metric_key
+
+                elif config["type"] == "bool":
+
+                    value = st.checkbox(
+                        label,
+                        value=config["default"],
+                        key=(
+                            f"independent_"
+                            f"{method}_"
+                            f"{parameter}"
+                        ),
+                        help=config["help"]
+                    )
+
+
+                algorithm_parameters[method][
+                    parameter
+                ] = value
+
+
+# ============================================================
+# INDEPENDENT CONTENT
+# ============================================================
+
+with tab_independent:
+
+    st.subheader(
+        "Independent Algorithms"
     )
 
-    with c2:
+    st.caption(
+        "Setiap algoritma berjalan secara independen "
+        "menggunakan input awalnya masing-masing."
+    )
 
-        fig = plot_nodes(
-            df,
-            home=home_index if has_constructive else 0,
-            title="Node Distribution"
+
+    if not selected_algorithms:
+
+        st.info(
+            "Pilih minimal satu algoritma pada sidebar."
         )
 
-        st.plotly_chart(
-            fig,
+
+    else:
+
+        if st.button(
+            "▶ Run Independent",
+            type="primary",
             use_container_width=True
-        )
-
-
-    # ========================================================
-    # RUN INDEPENDENT
-    # ========================================================
-
-    if st.button(
-        "▶ Jalankan Independent",
-        type="primary",
-        use_container_width=True
-    ):
-
-        if not selected_independent:
-
-            st.warning(
-                "Pilih minimal satu algoritma."
-            )
-
-        elif (
-            has_initial_route
-            and initial_route is None
         ):
 
-            st.warning(
-                "Initial route belum lengkap."
-            )
+            # ------------------------------------------------
+            # VALIDATION
+            # ------------------------------------------------
 
-        else:
+            if (
+                has_route_algorithm
+                and initial_route is None
+            ):
 
-            results = []
+                st.error(
+                    "Starting Route belum lengkap."
+                )
 
-            for method in selected_independent:
+            else:
 
-                try:
+                results = []
 
-                    # Setiap algoritma berjalan sendiri.
-                    result = run_one(
-                        method,
-                        df,
-                        dist_matrix,
-                        home_index=(
-                            home_index
-                            if ALGORITHMS[method]["needs_home"]
-                            else None
-                        ),
-                        initial_route=(
-                            initial_route
-                            if ALGORITHMS[method]["needs_initial_route"]
-                            else None
-                        ),
-                        parameters=independent_params.get(
-                            method,
-                            {}
+
+                # ------------------------------------------------
+                # RUN EACH ALGORITHM INDEPENDENTLY
+                # ------------------------------------------------
+
+                for method in selected_algorithms:
+
+                    try:
+
+                        # Constructive memakai start_node
+                        if ALGORITHMS[method][
+                            "needs_start_node"
+                        ]:
+
+                            result = (
+                                execute_independent_algorithm(
+                                    method=method,
+                                    df=df,
+                                    dist_matrix=dist_matrix,
+                                    start_node=start_node,
+                                    initial_route=None,
+                                    parameters=algorithm_parameters.get(
+                                        method,
+                                        {}
+                                    )
+                                )
+                            )
+
+                        # Local Search / Metaheuristic
+                        else:
+
+                            result = (
+                                execute_independent_algorithm(
+                                    method=method,
+                                    df=df,
+                                    dist_matrix=dist_matrix,
+                                    start_node=None,
+                                    initial_route=initial_route,
+                                    parameters=algorithm_parameters.get(
+                                        method,
+                                        {}
+                                    )
+                                )
+                            )
+
+
+                        results.append(
+                            result
                         )
-                    )
 
-                    results.append(result)
 
-                except Exception as e:
+                    except Exception as e:
 
-                    st.error(
-                        f"{method} gagal dijalankan: {e}"
-                    )
+                        st.error(
+                            f"{method} gagal dijalankan: {e}"
+                        )
 
-            st.session_state.independent_results = results
+
+                st.session_state.independent_results = (
+                    results
+                )
 
 
     # ========================================================
-    # INDEPENDENT RESULTS
+    # RESULTS
     # ========================================================
 
     results = st.session_state.independent_results
+
 
     if results:
 
         st.divider()
 
         st.subheader(
-            "Independent Results"
+            "Results"
         )
+
 
         for i, result in enumerate(results):
 
             method = result["method"]
 
-            st.markdown(
-                f"### {method}"
-            )
 
-            c1, c2, c3 = st.columns(3)
+            with st.expander(
+                method,
+                expanded=True
+            ):
 
-            c1.metric(
-                "Initial Distance",
-                (
-                    f"{result['initial_distance']:.2f}"
-                    if result["initial_distance"] is not None
-                    else "-"
+                col1, col2, col3 = st.columns(3)
+
+
+                with col1:
+
+                    if result["initial_distance"] is not None:
+
+                        st.metric(
+                            "Initial Distance",
+                            f"{result['initial_distance']:.2f}"
+                        )
+
+                    else:
+
+                        st.metric(
+                            "Initial Distance",
+                            "-"
+                        )
+
+
+                with col2:
+
+                    st.metric(
+                        "Final Distance",
+                        f"{result['final_distance']:.2f}"
+                    )
+
+
+                with col3:
+
+                    st.metric(
+                        "Execution Time",
+                        f"{result['execution_time'] * 1000:.3f} ms"
+                    )
+
+
+                st.write(
+                    "**Route:**",
+                    route_to_labels(
+                        df,
+                        result["route"]
+                    )
                 )
-            )
 
-            c2.metric(
-                "Final Distance",
-                f"{result['final_distance']:.2f}"
-            )
 
-            c3.metric(
-                "Execution Time",
-                f"{result['execution_time'] * 1000:.3f} ms"
-            )
+                if result["route"] is not None:
 
-            st.write(
-                "**Final Route:**",
-                route_to_labels(
-                    df,
-                    result["route"]
-                )
-            )
+                    fig = plot_route(
+                        df,
+                        result["route"],
+                        title=f"{method} — Final Route"
+                    )
 
-            if result["route"] is not None:
-
-                fig = plot_route(
-                    df,
-                    result["route"],
-                    home=result["route"][0],
-                    title=f"{method} — Final Route"
-                )
-
-                st.plotly_chart(
-                    fig,
-                    use_container_width=True,
-                    key=f"ind_route_{i}"
-                )
+                    st.plotly_chart(
+                        fig,
+                        use_container_width=True,
+                        key=f"independent_route_{i}"
+                    )
 
 
         # ====================================================
@@ -1230,17 +1382,15 @@ with tab_independent:
                 hide_index=True
             )
 
-            c1, c2 = st.columns(2)
 
-            best = get_best_distance(
-                comparison_df
-            )
+            col1, col2 = st.columns(2)
 
-            fastest = get_fastest_method(
-                comparison_df
-            )
 
-            with c1:
+            with col1:
+
+                best = get_best_distance(
+                    comparison_df
+                )
 
                 if best is not None:
 
@@ -1250,7 +1400,12 @@ with tab_independent:
                         f"{best['Final Distance']:.2f}"
                     )
 
-            with c2:
+
+            with col2:
+
+                fastest = get_fastest_method(
+                    comparison_df
+                )
 
                 if fastest is not None:
 
@@ -1260,9 +1415,11 @@ with tab_independent:
                         f"{fastest['Execution Time (ms)']:.3f} ms"
                     )
 
-            c1, c2 = st.columns(2)
 
-            with c1:
+            col1, col2 = st.columns(2)
+
+
+            with col1:
 
                 st.plotly_chart(
                     plot_distance_comparison(
@@ -1271,7 +1428,8 @@ with tab_independent:
                     use_container_width=True
                 )
 
-            with c2:
+
+            with col2:
 
                 st.plotly_chart(
                     plot_time_comparison(
@@ -1279,6 +1437,7 @@ with tab_independent:
                     ),
                     use_container_width=True
                 )
+
 
             st.plotly_chart(
                 plot_improvement_comparison(
@@ -1295,380 +1454,10 @@ with tab_independent:
 with tab_hybrid:
 
     st.subheader(
-        "Hybrid / Sequential Optimization"
+        "Hybrid"
     )
 
-    st.caption(
-        "Output dari suatu algoritma digunakan sebagai "
-        "initial route untuk algoritma berikutnya."
+    st.info(
+        "Hybrid akan dibuat setelah Independent "
+        "sudah berjalan dengan baik."
     )
-
-
-    # --------------------------------------------------------
-    # SIDEBAR HYBRID
-    # --------------------------------------------------------
-
-    with st.sidebar:
-
-        st.divider()
-
-        st.subheader(
-            "Hybrid Configuration"
-        )
-
-        hybrid_methods = st.multiselect(
-            "Urutan algoritma:",
-            list(ALGORITHMS.keys()),
-            key="hybrid_algorithms",
-            help=(
-                "Urutan pilihan menentukan urutan proses hybrid."
-            )
-        )
-
-
-        # ----------------------------------------------------
-        # HOME
-        # ----------------------------------------------------
-
-        hybrid_home = 0
-
-        hybrid_has_constructive = any(
-            ALGORITHMS[m]["needs_home"]
-            for m in hybrid_methods
-        )
-
-        if hybrid_has_constructive:
-
-            st.markdown(
-                "Node awal / Home"
-            )
-
-            hybrid_home_label = st.selectbox(
-                "Pilih node awal:",
-                df["node"].tolist(),
-                key="hybrid_home"
-            )
-
-            hybrid_home = int(
-                df.index[
-                    df["node"] == hybrid_home_label
-                ][0]
-            )
-
-            st.caption(
-                "Digunakan sebagai node awal "
-                "oleh metode Constructive."
-            )
-
-
-        # ----------------------------------------------------
-        # INITIAL ROUTE
-        # ----------------------------------------------------
-
-        first_needs_route = (
-            len(hybrid_methods) > 0
-            and ALGORITHMS[
-                hybrid_methods[0]
-            ]["needs_initial_route"]
-        )
-
-        hybrid_initial_route = None
-
-
-        if first_needs_route:
-
-            st.markdown(
-                "Initial Solution"
-            )
-
-            st.caption(
-                "Algoritma pertama membutuhkan "
-                "initial route sebagai titik awal."
-            )
-
-            hybrid_route_mode = st.radio(
-                "Sumber initial route:",
-                [
-                    "Generate Random",
-                    "Pilih manual"
-                ],
-                horizontal=True,
-                key="hybrid_route_mode"
-            )
-
-
-            if hybrid_route_mode == "Generate Random":
-
-                hybrid_seed = st.number_input(
-                    "Seed",
-                    min_value=0,
-                    max_value=99999,
-                    value=42,
-                    step=1,
-                    key="hybrid_seed"
-                )
-
-                hybrid_initial_route = (
-                    generate_initial_tour(
-                        len(df),
-                        home=0,
-                        seed=int(hybrid_seed)
-                    )
-                )
-
-
-            else:
-
-                remaining = [
-                    node
-                    for node in df["node"].tolist()
-                    if node != df.iloc[0]["node"]
-                ]
-
-                hybrid_order = st.multiselect(
-                    "Urutan node:",
-                    remaining,
-                    key="hybrid_manual_route"
-                )
-
-                if len(hybrid_order) == len(remaining):
-
-                    hybrid_initial_route = (
-                        make_manual_route(
-                            df,
-                            0,
-                            hybrid_order
-                        )
-                    )
-
-
-        # ----------------------------------------------------
-        # PARAMETERS FOR EACH STEP
-        # ----------------------------------------------------
-
-        hybrid_params = {}
-
-        for i, method in enumerate(hybrid_methods):
-
-            with st.expander(
-                f"Step {i + 1} — {method}"
-            ):
-
-                st.caption(
-                    ALGORITHMS[method]["description"]
-                )
-
-                hybrid_params[method] = (
-                    render_parameters(
-                        method,
-                        f"hybrid_{i}"
-                    )
-                )
-
-
-    # ========================================================
-    # PIPELINE PREVIEW
-    # ========================================================
-
-    if hybrid_methods:
-
-        st.markdown(
-            "### Hybrid Pipeline"
-        )
-
-        pipeline = " → ".join(
-            hybrid_methods
-        )
-
-        st.info(
-            pipeline
-        )
-
-
-    # ========================================================
-    # RUN HYBRID
-    # ========================================================
-
-    if st.button(
-        "▶ Jalankan Hybrid",
-        type="primary",
-        use_container_width=True
-    ):
-
-        if not hybrid_methods:
-
-            st.warning(
-                "Pilih minimal satu algoritma."
-            )
-
-        elif (
-            first_needs_route
-            and hybrid_initial_route is None
-        ):
-
-            st.warning(
-                "Initial route belum lengkap."
-            )
-
-        else:
-
-            dist_matrix = build_distance_matrix(
-                coords,
-                metric=metric_key
-            )
-
-            current_route = hybrid_initial_route
-
-            hybrid_results = []
-
-
-            for step, method in enumerate(
-                hybrid_methods
-            ):
-
-                try:
-
-                    result = run_one(
-                        method,
-                        df,
-                        dist_matrix,
-
-                        home_index=(
-                            hybrid_home
-                            if ALGORITHMS[method]["needs_home"]
-                            else None
-                        ),
-
-                        initial_route=(
-                            current_route
-                            if ALGORITHMS[method]["needs_initial_route"]
-                            else None
-                        ),
-
-                        parameters=hybrid_params.get(
-                            method,
-                            {}
-                        )
-                    )
-
-
-                    hybrid_results.append(
-                        result
-                    )
-
-
-                    # ------------------------------------------------
-                    # OUTPUT STEP INI MENJADI INPUT STEP BERIKUTNYA
-                    # ------------------------------------------------
-
-                    current_route = result["route"]
-
-
-                except Exception as e:
-
-                    st.error(
-                        f"Step {step + 1} — "
-                        f"{method} gagal: {e}"
-                    )
-
-                    break
-
-
-            st.session_state.hybrid_results = (
-                hybrid_results
-            )
-
-
-    # ========================================================
-    # HYBRID RESULT
-    # ========================================================
-
-    hybrid_results = (
-        st.session_state.hybrid_results
-    )
-
-    if hybrid_results:
-
-        st.divider()
-
-        st.subheader(
-            "Hybrid Results"
-        )
-
-
-        for i, result in enumerate(
-            hybrid_results
-        ):
-
-            st.markdown(
-                f"### Step {i + 1} — "
-                f"{result['method']}"
-            )
-
-            c1, c2, c3 = st.columns(3)
-
-            c1.metric(
-                "Initial Distance",
-                (
-                    f"{result['initial_distance']:.2f}"
-                    if result["initial_distance"] is not None
-                    else "-"
-                )
-            )
-
-            c2.metric(
-                "Final Distance",
-                f"{result['final_distance']:.2f}"
-            )
-
-            c3.metric(
-                "Execution Time",
-                f"{result['execution_time'] * 1000:.3f} ms"
-            )
-
-            st.write(
-                "**Route:**",
-                route_to_labels(
-                    df,
-                    result["route"]
-                )
-            )
-
-            if result["route"] is not None:
-
-                fig = plot_route(
-                    df,
-                    result["route"],
-                    home=result["route"][0],
-                    title=(
-                        f"Step {i + 1} — "
-                        f"{result['method']}"
-                    )
-                )
-
-                st.plotly_chart(
-                    fig,
-                    use_container_width=True,
-                    key=f"hybrid_route_{i}"
-                )
-
-
-        # ----------------------------------------------------
-        # FINAL HYBRID RESULT
-        # ----------------------------------------------------
-
-        final = hybrid_results[-1]
-
-        st.success(
-            f"Final Hybrid Distance: "
-            f"{final['final_distance']:.2f}"
-        )
-
-        st.write(
-            "**Final Hybrid Route:**",
-            route_to_labels(
-                df,
-                final["route"]
-            )
-        )
-
