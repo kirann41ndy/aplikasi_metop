@@ -352,6 +352,279 @@ def extract_history(result):
     return None
 
 
+# ------------------------------------------------------------
+# INITIAL SOLUTION RESOLVER
+# ------------------------------------------------------------
+
+def resolve_initial(
+    method,
+    initial_solutions,
+    selected_algorithms,
+    _seen=None
+):
+    """Kembalikan (start_node, initial_route) untuk satu algoritma."""
+
+    _seen = set(_seen or [])
+
+    if method in _seen:
+
+        raise ValueError(
+            f"Referensi 'Sama dengan' berputar pada {method}."
+        )
+
+    _seen.add(method)
+
+    solution = initial_solutions.get(method)
+
+    if not solution:
+        return None, None
+
+    if solution["type"] == "start_node":
+        return solution["start_node"], None
+
+    if solution["type"] == "route":
+        return None, solution["route"]
+
+    if solution["type"] == "same":
+
+        source = solution["source"]
+
+        if source not in selected_algorithms:
+
+            raise ValueError(
+                f"{method} meminta initial dari {source}, "
+                f"tetapi {source} tidak dipilih."
+            )
+
+        return resolve_initial(
+            source,
+            initial_solutions,
+            selected_algorithms,
+            _seen
+        )
+
+    return None, None
+
+
+# ------------------------------------------------------------
+# ITERATION HISTORY (STEP BY STEP)
+# ------------------------------------------------------------
+
+def _is_int(value):
+
+    return (
+        hasattr(value, "__index__")
+        and not isinstance(value, bool)
+    )
+
+
+def format_history_value(df, key, value):
+    """Ubah nilai history menjadi teks yang mudah dibaca."""
+
+    if isinstance(value, float):
+        return f"{value:.2f}"
+
+    if hasattr(value, "tolist"):
+        value = value.tolist()
+
+    if isinstance(value, (list, tuple)):
+
+        is_route = (
+            any(
+                word in key.lower()
+                for word in ("route", "tour")
+            )
+            and len(value) > 0
+            and all(
+                _is_int(v) and 0 <= int(v) < len(df)
+                for v in value
+            )
+        )
+
+        if is_route:
+            return route_to_labels(df, value)
+
+        return str(list(value))
+
+    return str(value)
+
+
+def history_to_dataframe(df, history):
+
+    rows = []
+
+    for i, item in enumerate(history, start=1):
+
+        if isinstance(item, dict):
+
+            row = {
+                "Iterasi": str(
+                    item.get("iteration", i)
+                )
+            }
+
+            for key, value in item.items():
+
+                if key == "iteration":
+                    continue
+
+                row[
+                    key.replace("_", " ").title()
+                ] = format_history_value(
+                    df,
+                    key,
+                    value
+                )
+
+        else:
+
+            row = {
+                "Iterasi": str(i),
+                "Info": str(item)
+            }
+
+        rows.append(row)
+
+    return pd.DataFrame(rows).fillna("-")
+
+
+def find_route_in_step(df, item):
+    """Cari rute pada satu iterasi (jika ada) untuk divisualisasikan."""
+
+    if not isinstance(item, dict):
+        return None
+
+    for key in (
+        "route_after",
+        "new_route",
+        "current_route",
+        "current_tour",
+        "route",
+        "tour",
+        "best_route",
+        "best_tour"
+    ):
+
+        value = item.get(key)
+
+        if hasattr(value, "tolist"):
+            value = value.tolist()
+
+        if (
+            isinstance(value, (list, tuple))
+            and len(value) >= len(df)
+            and all(
+                _is_int(v) and 0 <= int(v) < len(df)
+                for v in value
+            )
+        ):
+
+            route = [int(v) for v in value]
+
+            if route[0] != route[-1]:
+                route.append(route[0])
+
+            return route
+
+    return None
+
+
+def render_iteration_steps(df, result, index):
+    """Expander (tertutup) berisi proses per iterasi."""
+
+    method = result["method"]
+    history = result.get("history")
+
+    with st.expander(
+        "🔍 Lihat langkah per iterasi",
+        expanded=False
+    ):
+
+        if result["initial_route"] is not None:
+
+            st.write(
+                "**Initial Route:**",
+                route_to_labels(
+                    df,
+                    result["initial_route"]
+                )
+            )
+
+            st.write(
+                "**Initial Distance:**",
+                f"{result['initial_distance']:.2f}"
+            )
+
+        if not history:
+
+            st.info(
+                "Algoritma ini belum mengembalikan history "
+                "per iterasi. Pastikan fungsinya me-return "
+                "history (list of dict, satu dict per iterasi)."
+            )
+
+            return
+
+        if len(df) <= 26:
+
+            st.caption(
+                "Indeks node: "
+                + ", ".join(
+                    f"{i} = {n}"
+                    for i, n in enumerate(df["node"])
+                )
+            )
+
+        st.dataframe(
+            history_to_dataframe(df, history),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # Detail + visualisasi satu iterasi (dipilih dengan slider)
+
+        step = 1
+
+        if len(history) > 1:
+
+            step = st.slider(
+                "Pilih iterasi untuk dilihat detail & rutenya",
+                min_value=1,
+                max_value=len(history),
+                value=1,
+                key=f"independent_step_{index}"
+            )
+
+        item = history[step - 1]
+
+        if isinstance(item, dict):
+
+            for key, value in item.items():
+
+                st.write(
+                    f"**{key.replace('_', ' ').title()}:**",
+                    format_history_value(df, key, value)
+                )
+
+        else:
+
+            st.write(str(item))
+
+        route = find_route_in_step(df, item)
+
+        if route is not None:
+
+            st.plotly_chart(
+                plot_route(
+                    df,
+                    route,
+                    title=f"{method} — Iterasi {step}"
+                ),
+                use_container_width=True,
+                key=f"independent_step_route_{index}_{step}"
+            )
+
+
 # ============================================================
 # RUN ALGORITHM
 # ============================================================
@@ -874,6 +1147,10 @@ with st.sidebar:
         key="independent_algorithm_selection"
     )
 
+    # Selalu didefinisikan agar tidak NameError saat Run
+    initial_solutions = {}
+    algorithm_parameters = {}
+
 
     # --------------------------------------------------------
     # INITIAL SOLUTION
@@ -893,158 +1170,204 @@ with st.sidebar:
     if has_constructive or has_route_algorithm:
 
         st.divider()
-
-        st.subheader(
-            "Initial Solution"
-        )
+        st.subheader("Initial Solution")
 
 
-    # --------------------------------------------------------
-    # START NODE
-    # --------------------------------------------------------
+        # ====================================================
+        # INITIAL SOLUTION PER ALGORITHM
+        # ====================================================
 
-    start_node = None
+        for idx, method in enumerate(selected_algorithms):
 
-    if has_constructive:
+            config = ALGORITHMS[method]
 
-        st.selectbox(
-            "Start Node",
-            df["node"].tolist(),
-            key="independent_start_node",
-            help=(
-                "Digunakan oleh metode Constructive "
-                "untuk menentukan node awal."
-            )
-        )
-
-        start_node_label = st.session_state[
-            "independent_start_node"
-        ]
-
-        start_node = int(
-            df.index[
-                df["node"] == start_node_label
-            ][0]
-        )
+            st.markdown(f"**{method}**")
 
 
-    # --------------------------------------------------------
-    # STARTING ROUTE
-    # --------------------------------------------------------
+            # ------------------------------------------------
+            # CONSTRUCTIVE → START NODE
+            # ------------------------------------------------
 
-    initial_route = None
+            if config["needs_start_node"]:
 
-    if has_route_algorithm:
+                start_node_label = st.selectbox(
+                    "Start Node",
+                    df["node"].tolist(),
+                    key=f"independent_start_node_{method}",
+                    help=(
+                        "Digunakan oleh metode Constructive "
+                        "untuk menentukan node awal."
+                    )
+                )
 
-        st.selectbox(
-            "Starting Route",
-            [
-                "Generate Random",
-                "Manual"
-            ],
-            key="independent_route_type",
-            help=(
-                "Local Search dan Metaheuristic "
-                "membutuhkan satu rute sebagai solusi awal."
-            )
-        )
+                start_node = int(
+                    df.index[
+                        df["node"] == start_node_label
+                    ][0]
+                )
 
-        route_type = st.session_state[
-            "independent_route_type"
-        ]
-
-
-        # ----------------------------------------------------
-        # RANDOM ROUTE
-        # ----------------------------------------------------
-
-        if route_type == "Generate Random":
-
-            seed = st.number_input(
-                "Seed",
-                min_value=0,
-                max_value=99999,
-                value=42,
-                step=1,
-                key="independent_initial_seed"
-            )
-
-            initial_route = generate_initial_tour(
-                len(df),
-                home=0,
-                seed=int(seed)
-            )
+                initial_solutions[method] = {
+                    "type": "start_node",
+                    "start_node": start_node
+                }
 
 
-        # ----------------------------------------------------
-        # MANUAL ROUTE
-        # ----------------------------------------------------
+            # ------------------------------------------------
+            # LOCAL SEARCH / METAHEURISTIC → INITIAL ROUTE
+            # ------------------------------------------------
 
-        else:
+            elif config["needs_initial_route"]:
 
-            st.caption(
-                "Tentukan urutan node setelah node pertama."
-            )
-
-            route_start = st.selectbox(
-                "Route Start",
-                df["node"].tolist(),
-                key="independent_route_start"
-            )
-
-            route_start_index = int(
-                df.index[
-                    df["node"] == route_start
-                ][0]
-            )
-
-            remaining_nodes = [
-                node
-                for node in df["node"].tolist()
-                if node != route_start
-            ]
-
-            route_order = st.multiselect(
-                "Node Order",
-                remaining_nodes,
-                key="independent_route_order"
-            )
-
-            if len(route_order) == len(remaining_nodes):
-
-                initial_route = [
-                    route_start_index
+                # Hanya algoritma sebelumnya yang juga memakai
+                # initial route yang bisa dijadikan acuan.
+                previous_algorithms = [
+                    m
+                    for m in selected_algorithms[:idx]
+                    if ALGORITHMS[m]["needs_initial_route"]
                 ]
 
-                for node in route_order:
+                reuse_options = [
+                    "Generate Random",
+                    "Manual"
+                ]
 
-                    initial_route.append(
-                        int(
-                            df.index[
-                                df["node"] == node
-                            ][0]
-                        )
+                if previous_algorithms:
+
+                    reuse_options += [
+                        f"Sama dengan {previous_algorithms[-1]}"
+                    ]
+
+                route_type = st.selectbox(
+                    "Starting Route",
+                    reuse_options,
+                    key=f"independent_route_type_{method}",
+                    help=(
+                        "Local Search dan Metaheuristic "
+                        "membutuhkan satu rute sebagai solusi awal."
                     )
-
-                initial_route.append(
-                    route_start_index
                 )
 
 
-    # --------------------------------------------------------
-    # WHEN DIFFERENT ALGORITHMS NEED DIFFERENT INPUT
-    # --------------------------------------------------------
+                # --------------------------------------------
+                # SAMA DENGAN ALGORITMA SEBELUMNYA
+                # --------------------------------------------
 
-    if (
-        has_constructive
-        and has_route_algorithm
-    ):
+                if route_type.startswith("Sama dengan"):
 
-        st.caption(
-            "Start Node digunakan oleh Constructive, "
-            "sedangkan Starting Route digunakan oleh "
-            "Local Search dan Metaheuristic."
-        )
+                    source_method = previous_algorithms[-1]
+
+                    initial_solutions[method] = {
+                        "type": "same",
+                        "source": source_method
+                    }
+
+
+                # --------------------------------------------
+                # RANDOM
+                # --------------------------------------------
+
+                elif route_type == "Generate Random":
+
+                    seed = st.number_input(
+                        "Seed",
+                        min_value=0,
+                        max_value=99999,
+                        value=42,
+                        step=1,
+                        key=f"independent_initial_seed_{method}"
+                    )
+
+                    route = generate_initial_tour(
+                        len(df),
+                        home=0,
+                        seed=int(seed)
+                    )
+
+                    initial_solutions[method] = {
+                        "type": "route",
+                        "route": route
+                    }
+
+
+                # --------------------------------------------
+                # MANUAL
+                # --------------------------------------------
+
+                elif route_type == "Manual":
+
+                    route_start = st.selectbox(
+                        "Route Start",
+                        df["node"].tolist(),
+                        key=f"independent_route_start_{method}"
+                    )
+
+                    route_start_index = int(
+                        df.index[
+                            df["node"] == route_start
+                        ][0]
+                    )
+
+
+                    remaining_nodes = [
+                        node
+                        for node in df["node"].tolist()
+                        if node != route_start
+                    ]
+
+
+                    route_order = st.multiselect(
+                        "Node Order",
+                        remaining_nodes,
+                        key=f"independent_route_order_{method}"
+                    )
+
+
+                    if len(route_order) == len(remaining_nodes):
+
+                        route = [
+                            route_start_index
+                        ]
+
+                        for node in route_order:
+
+                            route.append(
+                                int(
+                                    df.index[
+                                        df["node"] == node
+                                    ][0]
+                                )
+                            )
+
+                        route.append(
+                            route_start_index
+                        )
+
+
+                        initial_solutions[method] = {
+                            "type": "route",
+                            "route": route
+                        }
+
+
+                        # ------------------------------------
+                        # FINAL INITIAL ROUTE
+                        # ------------------------------------
+
+                        st.caption("Final Initial Route")
+
+                        st.code(
+                            " → ".join(
+                                str(df.iloc[i]["node"])
+                                for i in route
+                            )
+                        )
+
+
+                    else:
+
+                        st.caption(
+                            "Pilih seluruh node untuk membentuk rute."
+                        )
 
 
     # --------------------------------------------------------
@@ -1065,9 +1388,6 @@ with st.sidebar:
         st.subheader(
             "Algorithm Parameters"
         )
-
-
-        algorithm_parameters = {}
 
 
         for method in algorithms_with_parameters:
@@ -1190,84 +1510,80 @@ with tab_independent:
             use_container_width=True
         ):
 
+            results = []
+
+
             # ------------------------------------------------
-            # VALIDATION
+            # RUN EACH ALGORITHM INDEPENDENTLY
             # ------------------------------------------------
 
-            if (
-                has_route_algorithm
-                and initial_route is None
-            ):
+            for method in selected_algorithms:
 
-                st.error(
-                    "Starting Route belum lengkap."
-                )
+                try:
 
-            else:
+                    start_node, initial_route = resolve_initial(
+                        method,
+                        initial_solutions,
+                        selected_algorithms
+                    )
 
-                results = []
+                    if (
+                        ALGORITHMS[method]["needs_start_node"]
+                        and start_node is None
+                    ):
 
-
-                # ------------------------------------------------
-                # RUN EACH ALGORITHM INDEPENDENTLY
-                # ------------------------------------------------
-
-                for method in selected_algorithms:
-
-                    try:
-
-                        # Constructive memakai start_node
-                        if ALGORITHMS[method][
-                            "needs_start_node"
-                        ]:
-
-                            result = (
-                                execute_independent_algorithm(
-                                    method=method,
-                                    df=df,
-                                    dist_matrix=dist_matrix,
-                                    start_node=start_node,
-                                    initial_route=None,
-                                    parameters=algorithm_parameters.get(
-                                        method,
-                                        {}
-                                    )
-                                )
-                            )
-
-                        # Local Search / Metaheuristic
-                        else:
-
-                            result = (
-                                execute_independent_algorithm(
-                                    method=method,
-                                    df=df,
-                                    dist_matrix=dist_matrix,
-                                    start_node=None,
-                                    initial_route=initial_route,
-                                    parameters=algorithm_parameters.get(
-                                        method,
-                                        {}
-                                    )
-                                )
-                            )
-
-
-                        results.append(
-                            result
+                        raise ValueError(
+                            "Start Node belum dipilih."
                         )
 
+                    if (
+                        ALGORITHMS[method]["needs_initial_route"]
+                        and initial_route is None
+                    ):
 
-                    except Exception as e:
-
-                        st.error(
-                            f"{method} gagal dijalankan: {e}"
+                        raise ValueError(
+                            "Starting Route belum lengkap."
                         )
 
+                    parameters = dict(
+                        algorithm_parameters.get(
+                            method,
+                            {}
+                        )
+                    )
 
-                st.session_state.independent_results = (
-                    results
-                )
+                    # Agar langkah per iterasi selalu tersedia
+                    if (
+                        "verbose_history"
+                        in ALGORITHMS[method]["parameters"]
+                    ):
+
+                        parameters["verbose_history"] = True
+
+                    result = execute_independent_algorithm(
+                        method=method,
+                        df=df,
+                        dist_matrix=dist_matrix,
+                        start_node=start_node,
+                        initial_route=initial_route,
+                        parameters=parameters
+                    )
+
+                    results.append(
+                        result
+                    )
+
+
+                except Exception as e:
+
+                    st.error(
+                        f"{method} gagal dijalankan: {e}"
+                    )
+
+
+            st.session_state.independent_results = (
+                results
+            )
 
 
     # ========================================================
@@ -1291,69 +1607,88 @@ with tab_independent:
             method = result["method"]
 
 
-            with st.expander(
-                method,
-                expanded=True
-            ):
+            # ------------------------------------------------
+            # HASIL AKHIR
+            # ------------------------------------------------
 
-                col1, col2, col3 = st.columns(3)
+            st.subheader(
+                method
+            )
 
-
-                with col1:
-
-                    if result["initial_distance"] is not None:
-
-                        st.metric(
-                            "Initial Distance",
-                            f"{result['initial_distance']:.2f}"
-                        )
-
-                    else:
-
-                        st.metric(
-                            "Initial Distance",
-                            "-"
-                        )
+            col1, col2, col3 = st.columns(3)
 
 
-                with col2:
+            with col1:
+
+                if result["initial_distance"] is not None:
 
                     st.metric(
-                        "Final Distance",
-                        f"{result['final_distance']:.2f}"
+                        "Initial Distance",
+                        f"{result['initial_distance']:.2f}"
                     )
 
-
-                with col3:
+                else:
 
                     st.metric(
-                        "Execution Time",
-                        f"{result['execution_time'] * 1000:.3f} ms"
+                        "Initial Distance",
+                        "-"
                     )
 
 
-                st.write(
-                    "**Route:**",
-                    route_to_labels(
-                        df,
-                        result["route"]
-                    )
+            with col2:
+
+                st.metric(
+                    "Final Distance",
+                    f"{result['final_distance']:.2f}"
                 )
 
 
-                if result["route"] is not None:
+            with col3:
 
-                    fig = plot_route(
-                        df,
-                        result["route"],
-                        title=f"{method} — Final Route"
-                    )
+                st.metric(
+                    "Execution Time",
+                    f"{result['execution_time'] * 1000:.3f} ms"
+                )
 
-                    st.plotly_chart(
-                        fig,
-                        use_container_width=True,
-                        key=f"independent_route_{i}"
-                    )
+
+            st.write(
+                "**Route:**",
+                route_to_labels(
+                    df,
+                    result["route"]
+                )
+            )
+
+
+            if result["route"] is not None:
+
+                fig = plot_route(
+                    df,
+                    result["route"],
+                    title=f"{method} — Final Route"
+                )
+
+                st.plotly_chart(
+                    fig,
+                    use_container_width=True,
+                    key=f"independent_route_{i}"
+                )
+
+
+            # ------------------------------------------------
+            # PROSES PER ITERASI (expander, tertutup)
+            # ------------------------------------------------
+
+            render_iteration_steps(
+                df,
+                result,
+                i
+            )
+
+
+            if i < len(results) - 1:
+
+                st.divider()
 
 
         # ====================================================
@@ -1425,7 +1760,8 @@ with tab_independent:
                     plot_distance_comparison(
                         comparison_df
                     ),
-                    use_container_width=True
+                    use_container_width=True,
+                    key="independent_cmp_distance"
                 )
 
 
@@ -1435,7 +1771,8 @@ with tab_independent:
                     plot_time_comparison(
                         comparison_df
                     ),
-                    use_container_width=True
+                    use_container_width=True,
+                    key="independent_cmp_time"
                 )
 
 
@@ -1443,7 +1780,8 @@ with tab_independent:
                 plot_improvement_comparison(
                     comparison_df
                 ),
-                use_container_width=True
+                use_container_width=True,
+                    key="independent_cmp_improvement"
             )
 
 
