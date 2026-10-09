@@ -23,9 +23,31 @@ def get_neighbors(route):
 
 
 def removed_edges(route, i, j):
-    """Edge (pasangan kota) yang dibuang oleh move (i, j) -- atribut tabu."""
+    """
+    Edge (pasangan kota) yang DIBUANG oleh move (i, j), dihitung dari rute
+    SAAT INI (sebelum move dijalankan). Dipakai buat CEK apakah kandidat
+    ini boleh dijalankan (dibandingkan dengan tabu_list).
+    """
     e1 = frozenset((route[i - 1], route[i]))
     e2 = frozenset((route[j], route[j + 1]))
+    return frozenset((e1, e2))
+
+
+def added_edges(route, i, j):
+    """
+    Edge (pasangan kota) yang TERBENTUK oleh move (i, j), dihitung dari
+    rute SAAT INI (sebelum move dijalankan) -- yaitu edge baru yang akan
+    ada setelah segmen [i..j] dibalik.
+
+    Inilah yang DISIMPAN ke tabu_list (bukan removed_edges!). Alasannya:
+    "gerakan balik lagi" (undo) ke rute sebelumnya = membongkar PERSIS
+    edge yang baru saja ditambahkan ini. Kalau yang disimpan malah edge
+    LAMA yang dibuang, larangan itu tidak akan pernah match, karena edge
+    lama itu sudah tidak ada lagi di rute manapun -- sehingga algoritma
+    bebas bolak-balik ke solusi yang sama tanpa pernah ketangkap tabu.
+    """
+    e1 = frozenset((route[i - 1], route[j]))
+    e2 = frozenset((route[i], route[j + 1]))
     return frozenset((e1, e2))
 
 
@@ -52,6 +74,11 @@ def tabu_search(
              terbaik jadi current solution, update tabu_list.
     Step 6 : i += 1, ulangi Step 4.
     Step 7 : stop kalau iterasi == max_iter. Rute terbaik = hasil akhir.
+
+    Larangan tabu dipasang di EDGE BARU yang terbentuk tiap move (lihat
+    added_edges di atas), supaya gerakan "balik lagi" ke rute sebelumnya
+    -- yang berarti membongkar edge baru itu -- bisa ketahuan dan ditolak
+    selama tabu_tenure iterasi (kecuali aspiration criterion terpenuhi).
 
     Parameters
     ----------
@@ -91,7 +118,7 @@ def tabu_search(
     best_route = list(current_route)
     best_distance = current_distance          # aspiration level awal (Step 2)
 
-    tabu_list = {}   # atribut (removed_edges) -> iterasi kadaluarsa
+    tabu_list = {}   # atribut (added_edges) -> iterasi kadaluarsa
 
     history = [{
         "iteration": 0,
@@ -118,10 +145,18 @@ def tabu_search(
         # Step 5: evaluasi seluruh neighborhood, pilih admissible terbaik
         for nb in neighbors:
 
-            attr = removed_edges(current_route, nb["i"], nb["j"])
+            # edge yang akan DIBUANG kalau kandidat ini dijalankan --
+            # dicek terhadap tabu_list (yang isinya edge BARU dari move
+            # sebelumnya). Match -> kandidat ini akan membongkar edge
+            # yang baru saja ditambahkan, berarti ini gerakan balik lagi.
+            check_attr = removed_edges(current_route, nb["i"], nb["j"])
+            # edge yang akan TERBENTUK kalau kandidat ini dijalankan --
+            # inilah yang disimpan ke tabu_list kalau kandidat ini kepilih.
+            new_attr = added_edges(current_route, nb["i"], nb["j"])
+
             d = tour_distance(nb["route"], dist_matrix)
 
-            is_tabu = attr in tabu_list and tabu_list[attr] >= iteration
+            is_tabu = check_attr in tabu_list and tabu_list[check_attr] >= iteration
             aspiration_met = d < best_distance          # aspiration criterion
             admissible = (not is_tabu) or aspiration_met
 
@@ -138,20 +173,20 @@ def tabu_search(
             if admissible and (best_candidate is None or d < best_candidate_distance):
                 best_candidate = nb
                 best_candidate_distance = d
-                best_candidate_attr = attr
+                best_candidate_attr = new_attr
 
         # fallback langka: semua kandidat tabu & tak satupun aspiration_met
         if best_candidate is None:
             best_candidate = min(neighbors, key=lambda nb: tour_distance(nb["route"], dist_matrix))
             best_candidate_distance = tour_distance(best_candidate["route"], dist_matrix)
-            best_candidate_attr = removed_edges(current_route, best_candidate["i"], best_candidate["j"])
+            best_candidate_attr = added_edges(current_route, best_candidate["i"], best_candidate["j"])
 
         selected_move = {"i": best_candidate["i"], "j": best_candidate["j"]}
 
         current_route = best_candidate["route"]
         current_distance = best_candidate_distance
 
-        # update tabu list: tambah move yang baru dipakai, buang yang kadaluarsa
+        # update tabu list: tambah EDGE BARU yang baru dibentuk, buang yang kadaluarsa
         tabu_list[best_candidate_attr] = iteration + tabu_tenure
         tabu_list = {k: v for k, v in tabu_list.items() if v >= iteration}
 
