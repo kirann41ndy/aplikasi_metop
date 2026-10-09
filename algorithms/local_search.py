@@ -2,16 +2,16 @@ import numbers
 
 from .base import tour_distance, validate_tour
 
-_EPS_REL = 1e-9
-_EPS = 1e-9
-_STRATEGIES = ("Best", "First")
+EPS_REL = 1e-9
+EPS = 1e-9
+STRATEGIES = ("Best", "First")
 
 
 # Helper bersama
-def _prepare(initial_route, dist_matrix, max_iter, strategy):
+def prepare(initial_route, dist_matrix, max_iter, strategy):
     """Validasi input: kembalikan salinan tur awal (input tidak dimutasi)."""
-    if strategy not in _STRATEGIES:
-        raise ValueError(f"strategy harus salah satu dari {_STRATEGIES}.")
+    if strategy not in STRATEGIES:
+        raise ValueError(f"strategy harus salah satu dari {STRATEGIES}.")
 
     n = len(dist_matrix)
     if any(len(row) != n for row in dist_matrix):
@@ -30,28 +30,28 @@ def _prepare(initial_route, dist_matrix, max_iter, strategy):
     return route
 
 
-def _edges(pairs, d):
+def edges(pairs, d):
     """Daftar edge beserta jaraknya: [{"edge": (u, v), "distance": d[u][v]}]."""
     return [{"edge": (u, v), "distance": d[u][v]} for u, v in pairs]
 
 
-def _move_cost(removed, added):
+def move_cost(removed, added):
     """Total jarak edge dilepas, total jarak edge baru, dan delta (baru - lama)."""
     removed_cost = sum(item["distance"] for item in removed)
     added_cost = sum(item["distance"] for item in added)
     return removed_cost, added_cost, added_cost - removed_cost
 
 
-def _local_search(
+def local_search(
     route, dist_matrix, max_iter, strategy,
     find_move, apply_move, describe_move
 ):
-    first_improvement = strategy == "first"
+    first_improvement = strategy == "First"
     best_route = route
     best_distance = tour_distance(best_route, dist_matrix)
 
-    # Toleransi relatif: rata-rata panjang edge tur awal x _EPS_REL
-    eps = _EPS_REL * best_distance / max(len(best_route) - 1, 1)
+    # Toleransi relatif: rata-rata panjang edge tur awal x EPS_REL
+    eps = EPS_REL * best_distance / max(len(best_route) - 1, 1)
 
     history = [{
         "iteration": 0,
@@ -88,7 +88,7 @@ def _local_search(
 
 
 # 2-opt
-def _find_2opt_move(route, d, first_improvement=False, eps=_EPS):
+def find_2opt_move(route, d, first_improvement=False, eps=EPS):
     n = len(route) - 1
     best = None
     best_delta = -eps
@@ -105,19 +105,19 @@ def _find_2opt_move(route, d, first_improvement=False, eps=_EPS):
     return best
 
 
-def _apply_2opt(route, move):
+def apply_2opt(route, move):
     _, i, j = move
     return route[:i] + route[i:j + 1][::-1] + route[j + 1:]
 
 
-def _describe_2opt_move(route, d, move):
+def describe_2opt_move(route, d, move):
     _, i, j = move
     a, b = route[i - 1], route[i]
     c, e = route[j], route[j + 1]
 
-    removed = _edges([(a, b), (c, e)], d)
-    added = _edges([(a, c), (b, e)], d)
-    removed_cost, added_cost, delta = _move_cost(removed, added)
+    removed = edges([(a, b), (c, e)], d)
+    added = edges([(a, c), (b, e)], d)
+    removed_cost, added_cost, delta = move_cost(removed, added)
 
     return {
         "type": "2-opt",
@@ -131,16 +131,16 @@ def _describe_2opt_move(route, d, move):
     }
 
 
-def two_opt(initial_route, dist_matrix, max_iter=100, strategy="best"):
-    route = _prepare(initial_route, dist_matrix, max_iter, strategy)
-    return _local_search(
+def two_opt(initial_route, dist_matrix, max_iter=100, strategy="Best"):
+    route = prepare(initial_route, dist_matrix, max_iter, strategy)
+    return local_search(
         route, dist_matrix, max_iter, strategy,
-        _find_2opt_move, _apply_2opt, _describe_2opt_move
+        find_2opt_move, apply_2opt, describe_2opt_move
     )
 
 
 # 3-opt
-def _find_3opt_move(route, d, first_improvement=False, eps=_EPS):
+def find_3opt_move(route, d, first_improvement=False, eps=EPS):
     n = len(route) - 1
     best = None
     best_delta = -eps
@@ -175,7 +175,7 @@ def _find_3opt_move(route, d, first_improvement=False, eps=_EPS):
     return best
 
 
-def _apply_3opt(route, move):
+def apply_3opt(route, move):
     _, i, j, k, variant = move
     A, B, C, D = route[:i], route[i:j], route[j:k], route[k:]
     if variant == 0:
@@ -196,7 +196,7 @@ def _apply_3opt(route, move):
 
 
 # Label penyambungan ulang per variant (A, B, C, D = segmen tur; X' = dibalik)
-_3OPT_RECONNECTIONS = (
+RECONNECTIONS_3OPT = (
     "A B' C D",     # 0 (setara 2-opt)
     "A B C' D",     # 1 (setara 2-opt)
     "A C' B' D",    # 2 (setara 2-opt)
@@ -207,7 +207,7 @@ _3OPT_RECONNECTIONS = (
 )
 
 
-def _describe_3opt_move(route, d, move):
+def describe_3opt_move(route, d, move):
     _, i, j, k, variant = move
     a, b1 = route[i - 1], route[i]
     b2, c1 = route[j - 1], route[j]
@@ -223,15 +223,15 @@ def _describe_3opt_move(route, d, move):
         [(a, c2), (c1, b1), (b2, e)],   # 6
     )[variant]
 
-    removed = _edges([(a, b1), (b2, c1), (c2, e)], d)
-    added = _edges(added_pairs, d)
-    removed_cost, added_cost, delta = _move_cost(removed, added)
+    removed = edges([(a, b1), (b2, c1), (c2, e)], d)
+    added = edges(added_pairs, d)
+    removed_cost, added_cost, delta = move_cost(removed, added)
 
     return {
         "type": "3-opt",
         "positions": {"i": i, "j": j, "k": k},
         "variant": variant,
-        "reconnection": _3OPT_RECONNECTIONS[variant],
+        "reconnection": RECONNECTIONS_3OPT[variant],
         "segments": {"B": route[i:j], "C": route[j:k]},
         "removed_edges": removed,
         "added_edges": added,
@@ -241,9 +241,9 @@ def _describe_3opt_move(route, d, move):
     }
 
 
-def three_opt(initial_route, dist_matrix, max_iter=100, strategy="best"):
-    route = _prepare(initial_route, dist_matrix, max_iter, strategy)
-    return _local_search(
+def three_opt(initial_route, dist_matrix, max_iter=100, strategy="Best"):
+    route = prepare(initial_route, dist_matrix, max_iter, strategy)
+    return local_search(
         route, dist_matrix, max_iter, strategy,
-        _find_3opt_move, _apply_3opt, _describe_3opt_move
+        find_3opt_move, apply_3opt, describe_3opt_move
     )
