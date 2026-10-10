@@ -4,7 +4,7 @@ from .base import tour_distance, validate_tour
 
 EPS_REL = 1e-9
 EPS = 1e-9
-STRATEGIES = ("Best", "First")
+STRATEGIES = ("best", "first")
 
 
 # Helper bersama
