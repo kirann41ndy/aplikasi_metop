@@ -46,7 +46,7 @@ def local_search(
     route, dist_matrix, max_iter, strategy,
     find_move, apply_move, describe_move
 ):
-    first_improvement = strategy == "First"
+    first_improvement = strategy == "first"
     best_route = route
     best_distance = tour_distance(best_route, dist_matrix)
 
@@ -131,7 +131,7 @@ def describe_2opt_move(route, d, move):
     }
 
 
-def two_opt(initial_route, dist_matrix, max_iter=100, strategy="Best"):
+def two_opt(initial_route, dist_matrix, max_iter=100, strategy="best"):
     route = prepare(initial_route, dist_matrix, max_iter, strategy)
     return local_search(
         route, dist_matrix, max_iter, strategy,
@@ -241,7 +241,7 @@ def describe_3opt_move(route, d, move):
     }
 
 
-def three_opt(initial_route, dist_matrix, max_iter=100, strategy="Best"):
+def three_opt(initial_route, dist_matrix, max_iter=100, strategy="best"):
     route = prepare(initial_route, dist_matrix, max_iter, strategy)
     return local_search(
         route, dist_matrix, max_iter, strategy,
