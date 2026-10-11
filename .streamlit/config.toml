@@ -1,1 +1,7 @@
-
+[theme]
+base = "light"
+primaryColor = "#6B0B0C"            # Rosewood  -> tombol, slider, radio, tab aktif
+backgroundColor = "#F4F8F9"         # biru-abu sangat lembut (tidak menyilaukan)
+secondaryBackgroundColor = "#E2EDF0" # Botticelli lembut -> sidebar, input, kode
+textColor = "#2D120D"               # Coffee Bean -> teks utama (kontras 17:1 di putih)
+font = "sans serif"
