@@ -1,12 +1,3 @@
-# -*- coding: utf-8 -*-
-
-"""
-comparison.py
-
-Fungsi untuk membandingkan hasil beberapa metode TSP.
-Tidak bergantung pada Streamlit.
-"""
-
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -21,7 +12,13 @@ def calculate_improvement(initial_distance, final_distance):
 
     Improvement (%) =
         ((Initial - Final) / Initial) * 100
+
+    Return None jika metode tidak memiliki initial solution
+    (misalnya metode Constructive yang membangun rute dari awal).
     """
+
+    if initial_distance is None:
+        return None
 
     if initial_distance == 0:
         return 0.0
@@ -46,20 +43,32 @@ def create_comparison_table(results):
     [
         {
             "method": "Nearest Neighbor",
-            "initial_distance": 120,
+            "initial_distance": None,      # Constructive: tidak ada initial
             "final_distance": 120,
             "execution_time": 0.002
         },
-        ...
+        {
+            "method": "2-opt",
+            "initial_distance": 150,
+            "final_distance": 120,
+            "execution_time": 0.004
+        }
     ]
+
+    Initial Distance dan Improvement (%) bernilai kosong (NaN)
+    untuk metode yang tidak memiliki initial solution.
     """
 
     rows = []
 
     for result in results:
 
-        initial = float(
-            result.get("initial_distance", 0)
+        initial_raw = result.get("initial_distance")
+
+        initial = (
+            None
+            if initial_raw is None
+            else float(initial_raw)
         )
 
         final = float(
@@ -82,9 +91,10 @@ def create_comparison_table(results):
                     "Unknown"
                 ),
 
-                "Initial Distance": round(
-                    initial,
-                    2
+                "Initial Distance": (
+                    None
+                    if initial is None
+                    else round(initial, 2)
                 ),
 
                 "Final Distance": round(
@@ -92,9 +102,10 @@ def create_comparison_table(results):
                     2
                 ),
 
-                "Improvement (%)": round(
-                    improvement,
-                    2
+                "Improvement (%)": (
+                    None
+                    if improvement is None
+                    else round(improvement, 2)
                 ),
 
                 "Execution Time (ms)": round(
@@ -190,7 +201,8 @@ def plot_distance_comparison(comparison_df):
             x=comparison_df["Method"],
             y=comparison_df["Final Distance"],
             text=comparison_df["Final Distance"],
-            textposition="auto"
+            textposition="auto",
+            marker_color="#6B0B0C"
         )
     )
 
@@ -227,7 +239,8 @@ def plot_time_comparison(comparison_df):
             x=comparison_df["Method"],
             y=comparison_df["Execution Time (ms)"],
             text=comparison_df["Execution Time (ms)"],
-            textposition="auto"
+            textposition="auto",
+            marker_color="#4F8FA3"
         )
     )
 
@@ -257,21 +270,44 @@ def plot_improvement_comparison(comparison_df):
 
     Semakin besar improvement,
     semakin besar penurunan jarak dari initial solution.
+
+    Hanya metode yang memiliki initial solution yang ditampilkan.
     """
+
+    data = comparison_df.dropna(
+        subset=["Improvement (%)"]
+    )
 
     fig = go.Figure()
 
-    fig.add_trace(
-        go.Bar(
-            x=comparison_df["Method"],
-            y=comparison_df["Improvement (%)"],
-            text=[
-                f"{x:.2f}%"
-                for x in comparison_df["Improvement (%)"]
-            ],
-            textposition="auto"
+    if data.empty:
+
+        fig.add_annotation(
+            text=(
+                "Tidak ada metode dengan initial solution "
+                "(improvement tidak dapat dihitung)."
+            ),
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False
         )
-    )
+
+    else:
+
+        fig.add_trace(
+            go.Bar(
+                x=data["Method"],
+                y=data["Improvement (%)"],
+                text=[
+                    f"{x:.2f}%"
+                    for x in data["Improvement (%)"]
+                ],
+                textposition="auto",
+                marker_color="#B23A48"
+            )
+        )
 
     fig.update_layout(
         title="Solution Improvement",
