@@ -1,4 +1,56 @@
+from pathlib import Path
+
 import pandas as pd
+
+
+# ============================================================
+# KONFIGURASI FILE
+# ============================================================
+
+# Root proyek (satu tingkat di atas folder utils/)
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Logo transparan (disimpan di folder utils/)
+LOGO_PATH = BASE_DIR / "utils" / "logo.png"
+
+# Dataset bawaan (CSV tanpa header: kolom x, y)
+DATASET_SMALL = BASE_DIR / "dataset" / "small.csv"
+DATASET_SMALL_NAME = "dataset/small.csv"
+
+
+def load_page_icon(fallback="🧭"):
+    """
+    Ikon tab browser dari logo. Logo berbentuk lebar, jadi diberi
+    ruang transparan agar menjadi persegi (tidak gepeng).
+    """
+
+    try:
+
+        from PIL import Image
+
+        image = Image.open(LOGO_PATH).convert("RGBA")
+
+        side = max(image.size)
+
+        canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+
+        canvas.paste(
+            image,
+            ((side - image.width) // 2, (side - image.height) // 2),
+            image
+        )
+
+        return canvas.resize((128, 128))
+
+    except Exception:
+
+        return fallback
+
+
+# ============================================================
+# LOAD DATA
+# ============================================================
+
 def load_data(file):
 
     if isinstance(file, pd.DataFrame):
@@ -135,4 +187,3 @@ def load_data(file):
     data = data.reset_index(drop=True)
 
     return data
-
