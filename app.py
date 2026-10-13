@@ -31,7 +31,14 @@ from algorithms.tabu_search import (
     tabu_search
 )
 
-from utils.load_data import load_data
+# Pembacaan data + logo + dataset bawaan digabung di utils/load_data.py
+from utils.load_data import (
+    load_data,
+    load_page_icon,
+    LOGO_PATH,
+    DATASET_SMALL,
+    DATASET_SMALL_NAME
+)
 
 from utils.visualization import (
     plot_nodes,
@@ -55,20 +62,103 @@ from utils.comparison import (
 # ============================================================
 
 st.set_page_config(
-    page_title="TSP Learning & Optimization",
-    page_icon="🧭",
+    page_title=" Learning & Optimization",
+    page_icon=load_page_icon(),
     layout="wide"
 )
 
-# Tema "Botticelli Mist": dasar biru-abu lembut (turunan Botticelli #CDE3E8), tanpa kuning.
-# Teks Coffee Bean #2D120D; aksen Rosewood #6B0B0C; kartu putih agar menonjol lembut.
+# Logo (utils/logo.png, transparan) dipakai di kartu brand sidebar dan
+# header halaman utama. Komponen sidebar dibuat di fungsi-fungsi berikut.
+
+@st.cache_resource(show_spinner=False)
+def _logo_data_uri(size=360):
+    """Logo transparan (PNG) sebagai data URI untuk HTML sidebar."""
+
+    import base64
+    import io
+
+    try:
+
+        from PIL import Image
+
+        image = Image.open(LOGO_PATH).convert("RGBA")
+
+        image.thumbnail((size, size), Image.LANCZOS)
+
+        buffer = io.BytesIO()
+
+        image.save(buffer, format="PNG")
+
+        return (
+            "data:image/png;base64,"
+            + base64.b64encode(buffer.getvalue()).decode("ascii")
+        )
+
+    except Exception:
+
+        return None
+
+
+def render_sidebar_brand():
+    """Kartu brand di atas sidebar: logo transparan + nama aplikasi."""
+
+    uri = _logo_data_uri() if LOGO_PATH.exists() else None
+
+    logo_html = f'<img src="{uri}" alt="TSP"/>' if uri else ""
+
+    st.markdown(
+        f"""
+        <div class="tsp-brand">
+            {logo_html}
+            <div>
+                <div class="tsp-brand-title">TSP Optimizer</div>
+                <div class="tsp-brand-sub">Learning &amp; Optimization</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def sidebar_section(title, icon, expanded=True):
+    """Section sidebar yang bisa dilipat, lengkap dengan ikon."""
+
+    try:
+        return st.expander(title, expanded=expanded, icon=icon)
+    except TypeError:               
+        return st.expander(title, expanded=expanded)
+
+
+def sidebar_run_bar():
+    """Wadah tombol Run yang menempel di dasar sidebar."""
+
+    try:
+        return st.container(key="run_bar")
+    except TypeError:               # Streamlit versi lama (tanpa parameter key)
+        return st.container()
+
+
+def run_button(label, **kwargs):
+    """Tombol Run lebar penuh + ikon petir (fallback untuk Streamlit lama)."""
+
+    try:
+        return st.button(label, icon=":material/bolt:", width="stretch", **kwargs)
+    except TypeError:
+        kwargs["use_container_width"] = True
+        return st.button(label, **kwargs)
+
+
+# Tema "Botticelli Mist": dasar biru-abu lembut (turunan Botticelli #CDE3E8).
+# Teks Coffee Bean #2D120D; aksen Rosewood #6B0B0C.
+# Sidebar: dasar maroon, teks putih / kuning / biru muda.
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap');
 
     :root {
         --rosewood: #6B0B0C;
+        --rosewood-dark: #4A0708;
         --coffee: #2D120D;
         --mist: #F4F8F9;
         --mist-deep: #E2EDF0;
@@ -76,12 +166,15 @@ st.markdown(
         --botticelli: #CDE3E8;
         --botticelli-soft: #E1EEF1;
         --teal: #4F8FA3;
+        --yellow: #FFFBCA;
+        --yellow-deep: #E9DC7A;
+        --gold: #F4C20D;
     }
 
     /* Cadangan jika .streamlit/config.toml belum dipasang */
     .stApp { background-color: var(--mist); color: var(--coffee); }
 
-    /* Judul klasik (serif) */
+    /* ---------------- Judul (tanpa highlight) ---------------- */
     h1, h2, h3 {
         font-family: 'Playfair Display', Georgia, 'Times New Roman', serif !important;
         color: var(--rosewood) !important;
@@ -89,20 +182,532 @@ st.markdown(
     }
     h4, h5 { color: var(--coffee) !important; }
 
+    /* Hierarki ukuran + jarak: Results (h2) > nama algoritma (h3) */
+    [data-testid="stMain"] h2 {
+        font-size: 2.1rem !important;
+        margin-top: 0.5rem !important;
+        margin-bottom: 1.2rem !important;
+    }
+    [data-testid="stMain"] h3 {
+        font-size: 1.4rem !important;
+        margin-top: 1.6rem !important;
+        margin-bottom: 0.8rem !important;
+    }
+
     /* Garis pemisah lembut */
     hr { border-color: rgba(107, 11, 12, 0.18) !important; }
 
-    /* Sidebar */
+    /* ======================================================
+       SIDEBAR  (gaya baru: maroon gradasi, kartu, ikon)
+       ====================================================== */
     [data-testid="stSidebar"] {
-        background-color: var(--mist-deep) !important;
-        border-right: 1px solid rgba(107, 11, 12, 0.15);
+        background: linear-gradient(180deg, #641712 0%, #511210 48%, #3F0C09 100%) !important;
+        border-right: 1px solid rgba(0, 0, 0, 0.30);
+        font-family: 'Inter', 'Source Sans Pro', system-ui, sans-serif;
     }
-    [data-testid="stSidebar"] hr { margin: 0.6rem 0 !important; }
-    .st-key-sidebar_title { gap: 0.15rem !important; }
-    .st-key-sidebar_title hr { margin: 0.15rem 0 0.35rem 0 !important; }
-    .st-key-sidebar_title h2 { padding: 0 0 0.15rem 0 !important; }
+    [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+    }
+    [data-testid="stSidebar"] hr {
+        margin: 0.7rem 0 !important;
+        border-color: rgba(255, 255, 255, 0.12) !important;
+    }
 
-    /* Tombol utama */
+    /* Header bawaan: hanya tombol tutup sidebar, melayang di kanan atas
+       kartu brand */
+    [data-testid="stSidebarHeader"] {
+        position: absolute;
+        top: 1.15rem;
+        right: 0.8rem;
+        z-index: 10;
+        height: auto !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+    }
+    [data-testid="stSidebarHeader"] button,
+    [data-testid="stSidebarCollapseButton"] button {
+        color: rgba(255, 255, 255, 0.75) !important;
+    }
+    [data-testid="stSidebarHeader"] svg {
+        color: rgba(255, 255, 255, 0.75) !important;
+        fill: rgba(255, 255, 255, 0.75) !important;
+    }
+    [data-testid="stSidebarUserContent"] {
+        padding-top: 1.1rem !important;
+    }
+
+    /* ---- Kartu brand (logo transparan + judul) ---- */
+    .tsp-brand {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0 1.9rem 1rem 0;
+        margin-bottom: 0.2rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .tsp-brand img {
+        height: 2.25rem;
+        width: auto;
+        flex-shrink: 0;
+        background: transparent;
+        filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.30));
+    }
+    .tsp-brand .tsp-brand-title {
+        color: #FFFFFF;
+        font-weight: 700;
+        font-size: 1.05rem;
+        line-height: 1.2;
+        letter-spacing: 0.1px;
+        white-space: nowrap;
+    }
+    .tsp-brand .tsp-brand-sub {
+        color: rgba(255, 255, 255, 0.62);
+        font-size: 0.78rem;
+        line-height: 1.3;
+        white-space: nowrap;
+    }
+
+    /* ---- Section (expander) dengan ikon ---- */
+    [data-testid="stSidebar"] [data-testid="stExpander"] {
+        border: none !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] details {
+        border: none !important;
+        background: transparent !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary {
+        padding: 1rem 0 0.8rem 0 !important;
+        background: transparent !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {
+        background: transparent !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary p,
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary span {
+        color: #FFFFFF !important;
+        font-size: 1.02rem !important;
+        font-weight: 500 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary svg {
+        color: rgba(255, 255, 255, 0.85) !important;
+        fill: rgba(255, 255, 255, 0.85) !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpanderDetails"] {
+        padding: 0.1rem 0 1.1rem 0 !important;
+    }
+
+    /* ---- Label widget: kecil, huruf kapital, redup ---- */
+    [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+        color: rgba(255, 255, 255, 0.62) !important;
+        font-size: 0.72rem !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+    }
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        color: rgba(255, 255, 255, 0.82);
+        font-size: 0.88rem;
+    }
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+        color: rgba(255, 255, 255, 0.62) !important;
+        font-size: 0.8rem !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stTooltipIcon"] svg {
+        color: rgba(255, 255, 255, 0.6);
+    }
+
+    /* ---- Kotak info / peringatan ---- */
+    [data-testid="stSidebar"] [data-testid="stAlert"] {
+        background: rgba(255, 255, 255, 0.06) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 12px !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stAlert"] p,
+    [data-testid="stSidebar"] [data-testid="stAlert"] svg {
+        color: rgba(255, 255, 255, 0.85) !important;
+        fill: rgba(255, 255, 255, 0.85) !important;
+        font-size: 0.85rem !important;
+    }
+
+    /* ---- Input / select: kaca gelap berujung bulat ---- */
+    [data-testid="stSidebar"] [data-baseweb="select"] > div,
+    [data-testid="stSidebar"] [data-baseweb="input"],
+    [data-testid="stSidebar"] [data-baseweb="base-input"] {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(255, 255, 255, 0.14) !important;
+        border-radius: 12px !important;
+        transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+    [data-testid="stSidebar"] [data-baseweb="select"] > div:hover,
+    [data-testid="stSidebar"] [data-baseweb="input"]:hover {
+        background-color: rgba(255, 255, 255, 0.12) !important;
+        border-color: rgba(255, 255, 255, 0.28) !important;
+    }
+    [data-testid="stSidebar"] [data-baseweb="select"] > div:focus-within,
+    [data-testid="stSidebar"] [data-baseweb="input"]:focus-within {
+        border-color: var(--yellow) !important;
+    }
+    [data-testid="stSidebar"] input,
+    [data-testid="stSidebar"] [data-baseweb="select"] div {
+        color: #FFFFFF !important;
+    }
+    [data-testid="stSidebar"] input::placeholder {
+        color: rgba(255, 255, 255, 0.6) !important;
+    }
+    [data-testid="stSidebar"] [data-baseweb="select"] svg {
+        color: rgba(255, 255, 255, 0.85) !important;
+        fill: rgba(255, 255, 255, 0.85) !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stNumberInputStepUp"],
+    [data-testid="stSidebar"] [data-testid="stNumberInputStepDown"] {
+        background: transparent !important;
+        color: rgba(255, 255, 255, 0.85) !important;
+    }
+    [data-testid="stSidebar"] [data-baseweb="tag"] {
+        background-color: var(--yellow) !important;
+        border-radius: 8px !important;
+    }
+    [data-testid="stSidebar"] [data-baseweb="tag"] span,
+    [data-testid="stSidebar"] [data-baseweb="tag"] div,
+    [data-testid="stSidebar"] [data-baseweb="tag"] svg {
+        color: var(--rosewood) !important;
+        fill: var(--rosewood) !important;
+    }
+
+    /* ---- Streamlit baru (react-aria): select, input, tag, radio ---- */
+    [data-testid="stSidebar"] .react-aria-ComboBox > [role="group"],
+    [data-testid="stSidebar"] [data-testid="stNumberInputContainer"] {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(255, 255, 255, 0.14) !important;
+        border-radius: 12px !important;
+        transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+    [data-testid="stSidebar"] .react-aria-ComboBox > [role="group"]:hover,
+    [data-testid="stSidebar"] [data-testid="stNumberInputContainer"]:hover {
+        background-color: rgba(255, 255, 255, 0.12) !important;
+        border-color: rgba(255, 255, 255, 0.28) !important;
+    }
+    [data-testid="stSidebar"] .react-aria-ComboBox > [role="group"]:focus-within,
+    [data-testid="stSidebar"] [data-testid="stNumberInputContainer"]:focus-within {
+        border-color: var(--yellow) !important;
+    }
+    [data-testid="stSidebar"] .react-aria-ComboBox input,
+    [data-testid="stSidebar"] [data-testid="stNumberInputField"] {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF;
+        background: transparent !important;
+    }
+    [data-testid="stSidebar"] .react-aria-ComboBox input::placeholder,
+    [data-testid="stSidebar"] [data-testid="stNumberInputField"]::placeholder {
+        color: rgba(255, 255, 255, 0.6) !important;
+        -webkit-text-fill-color: rgba(255, 255, 255, 0.6);
+    }
+    [data-testid="stSidebar"] .react-aria-ComboBox button,
+    [data-testid="stSidebar"] .react-aria-ComboBox button svg,
+    [data-testid="stSidebar"] [data-testid="stNumberInputContainer"] button,
+    [data-testid="stSidebar"] [data-testid="stNumberInputContainer"] button svg {
+        color: rgba(255, 255, 255, 0.85) !important;
+        fill: rgba(255, 255, 255, 0.85) !important;
+        background: transparent !important;
+    }
+    [data-testid="stSidebar"] [data-tag] {
+        background-color: var(--yellow) !important;
+        border-radius: 8px !important;
+    }
+    [data-testid="stSidebar"] [data-tag] span,
+    [data-testid="stSidebar"] [data-tag] svg,
+    [data-testid="stSidebar"] [data-tag] button {
+        color: var(--rosewood) !important;
+        fill: var(--rosewood) !important;
+        opacity: 1 !important;
+    }
+    [data-testid="stSidebar"] .react-aria-ComboBox [data-tag] button,
+    [data-testid="stSidebar"] .react-aria-ComboBox [data-tag] button svg {
+        color: var(--rosewood) !important;
+        fill: var(--rosewood) !important;
+    }
+
+    /* Radio chip (horizontal) */
+    [data-testid="stSidebar"] [data-testid="stRadioGroup"] {
+        gap: 0.45rem;
+    }
+    [data-testid="stSidebar"] [class*="_active_"] [data-testid="stRadio"] [data-testid="stRadioGroup"] {
+        flex-wrap: wrap;
+    }
+    [data-testid="stSidebar"] [class*="_active_"] [data-testid="stRadio"] [data-testid="stRadioOption"] {
+        margin: 0 !important;
+        padding: 0.35rem 0.85rem;
+        border: 1px solid rgba(255, 255, 255, 0.20);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.05);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    [data-testid="stSidebar"] [class*="_active_"] [data-testid="stRadio"] [data-testid="stRadioOption"] > div > div:first-child {
+        display: none !important;
+    }
+    [data-testid="stSidebar"] [class*="_active_"] [data-testid="stRadio"] [data-testid="stRadioOption"] p {
+        color: rgba(255, 255, 255, 0.85) !important;
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+    }
+    [data-testid="stSidebar"] [class*="_active_"] [data-testid="stRadio"] [data-testid="stRadioOption"]:hover {
+        background: rgba(255, 255, 255, 0.12);
+    }
+    [data-testid="stSidebar"] [class*="_active_"] [data-testid="stRadio"] [data-testid="stRadioOption"][data-selected="true"] {
+        background: var(--yellow);
+        border-color: var(--yellow);
+    }
+    [data-testid="stSidebar"] [class*="_active_"] [data-testid="stRadio"] [data-testid="stRadioOption"][data-selected="true"] p {
+        color: var(--rosewood) !important;
+        font-weight: 700 !important;
+    }
+
+    /* Mode: kartu vertikal dengan lingkaran radio */
+    .st-key-run_mode,
+    .st-key-run_mode [data-testid="stRadio"] {
+        width: 100% !important;
+    }
+    .st-key-run_mode [data-testid="stRadioGroup"] > div {
+        width: 100% !important;
+    }
+    .st-key-run_mode [data-testid="stRadioOption"] > div {
+        width: 100%;
+    }
+    .st-key-run_mode [data-testid="stRadioGroup"] {
+        align-items: stretch;
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+        width: 100%;
+    }
+    .st-key-run_mode [data-testid="stRadioOption"] {
+        margin: 0 !important;
+        width: 100%;
+        padding: 0.8rem 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .st-key-run_mode [data-testid="stRadioOption"] > div > div:first-child {
+        background-color: transparent !important;
+        border-color: rgba(255, 255, 255, 0.55) !important;
+    }
+    .st-key-run_mode [data-testid="stRadioOption"] p {
+        color: rgba(255, 255, 255, 0.9) !important;
+        font-size: 1rem !important;
+        font-weight: 500 !important;
+    }
+    .st-key-run_mode [data-testid="stRadioOption"]:hover {
+        background: rgba(255, 255, 255, 0.09);
+    }
+    .st-key-run_mode [data-testid="stRadioOption"][data-selected="true"] {
+        background: rgba(255, 255, 255, 0.13);
+        border-color: rgba(255, 251, 202, 0.85);
+    }
+    .st-key-run_mode [data-testid="stRadioOption"][data-selected="true"] > div > div:first-child {
+        border-color: var(--yellow) !important;
+        background-color: var(--yellow) !important;
+        box-shadow: inset 0 0 0 4px #5C1813;
+    }
+    .st-key-run_mode [data-testid="stRadioOption"][data-selected="true"] > div > div:first-child > div {
+        background: transparent !important;
+    }
+    .st-key-run_mode [data-testid="stRadioOption"][data-selected="true"] p {
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+    }
+
+    /* Panah section di sisi kanan (seperti desain Figma) */
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary {
+        display: flex !important;
+        align-items: center;
+        justify-content: space-between;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary::after {
+        content: "";
+        flex-shrink: 0;
+        width: 0.5rem;
+        height: 0.5rem;
+        margin-right: 0.35rem;
+        border-right: 2px solid rgba(255, 255, 255, 0.8);
+        border-bottom: 2px solid rgba(255, 255, 255, 0.8);
+        transform: translateY(-2px) rotate(45deg);
+        transition: transform 0.15s ease;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] details:not([open]) summary::after {
+        transform: translateX(-2px) rotate(-45deg);
+    }
+    [data-testid="stSidebar"] [data-testid="stAlert"] * {
+        color: rgba(255, 255, 255, 0.85) !important;
+    }
+
+    /* ---- Radio umum di sidebar: chip bulat ---- */
+    [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] {
+        gap: 0.45rem;
+    }
+    [data-testid="stSidebar"] [class*="_active_"] [data-testid="stRadio"] label[data-baseweb="radio"] {
+        margin: 0 !important;
+        padding: 0.35rem 0.85rem;
+        border: 1px solid rgba(255, 255, 255, 0.20);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.05);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    [data-testid="stSidebar"] [class*="_active_"] [data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {
+        display: none !important;
+    }
+    [data-testid="stSidebar"] [class*="_active_"] [data-testid="stRadio"] label[data-baseweb="radio"] p {
+        color: rgba(255, 255, 255, 0.85) !important;
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+    [data-testid="stSidebar"] [class*="_active_"] [data-testid="stRadio"] label[data-baseweb="radio"]:hover {
+        background: rgba(255, 255, 255, 0.12);
+    }
+    [data-testid="stSidebar"] [class*="_active_"] [data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) {
+        background: var(--yellow);
+        border-color: var(--yellow);
+    }
+    [data-testid="stSidebar"] [class*="_active_"] [data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) p {
+        color: var(--rosewood) !important;
+        font-weight: 700 !important;
+    }
+
+    /* ---- MODE (Independent / Hybrid): kartu vertikal + lingkaran radio ---- */
+    .st-key-run_mode [role="radiogroup"] {
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+        width: 100%;
+    }
+    .st-key-run_mode label[data-baseweb="radio"] {
+        margin: 0 !important;
+        padding: 0.8rem 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .st-key-run_mode label[data-baseweb="radio"] > div:first-child {
+        background-color: transparent !important;
+        border-color: rgba(255, 255, 255, 0.55) !important;
+    }
+    .st-key-run_mode label[data-baseweb="radio"] p {
+        color: rgba(255, 255, 255, 0.9) !important;
+        font-size: 1rem !important;
+        font-weight: 500 !important;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+    .st-key-run_mode label[data-baseweb="radio"]:hover {
+        background: rgba(255, 255, 255, 0.09);
+    }
+    .st-key-run_mode label[data-baseweb="radio"]:has(input:checked) {
+        background: rgba(255, 255, 255, 0.13);
+        border-color: rgba(255, 251, 202, 0.85);
+    }
+    .st-key-run_mode label[data-baseweb="radio"]:has(input:checked) > div:first-child {
+        background-color: var(--yellow) !important;
+        border-color: var(--yellow) !important;
+        box-shadow: inset 0 0 0 4px #5C1813;
+    }
+    .st-key-run_mode label[data-baseweb="radio"]:has(input:checked) p {
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+    }
+
+    /* Checkbox */
+    [data-testid="stSidebar"] [data-baseweb="checkbox"] > span:first-child {
+        border-color: rgba(255, 255, 255, 0.55) !important;
+    }
+    [data-testid="stSidebar"] [data-baseweb="checkbox"]:has(input:checked) > span:first-child {
+        background-color: var(--gold) !important;
+        border-color: var(--gold) !important;
+    }
+
+    /* ---- Bar RUN: selalu menempel di dasar sidebar ---- */
+    [data-testid="stSidebarUserContent"] {
+        padding-bottom: 0 !important;
+    }
+    [data-testid="stSidebarUserContent"] > div > [data-testid="stVerticalBlock"],
+    [data-testid="stSidebarUserContent"] > [data-testid="stVerticalBlock"] {
+        min-height: calc(100vh - 1.4rem);
+    }
+    [data-testid="stLayoutWrapper"]:has(> .st-key-run_bar),
+    .st-key-run_bar:not([data-testid="stLayoutWrapper"] > *) {
+        position: sticky;
+        bottom: 0;
+        z-index: 20;
+        margin-top: auto;
+    }
+    .st-key-run_bar {
+        padding: 1.4rem 0 1.2rem 0;
+        background: linear-gradient(180deg, rgba(63, 12, 9, 0) 0%, #3F0C09 35%);
+    }
+    [data-testid="stSidebar"] button[kind="primary"],
+    [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {
+        background: linear-gradient(180deg, #FFF6BF 0%, #F4C20D 100%) !important;
+        color: #4A0708 !important;
+        border: none !important;
+        border-radius: 14px !important;
+        font-weight: 700 !important;
+        font-size: 1.02rem !important;
+        letter-spacing: 0.3px;
+        padding: 0.8rem 1rem !important;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35) !important;
+        transition: transform 0.1s ease, filter 0.1s ease;
+    }
+    [data-testid="stSidebar"] button[kind="primary"] p,
+    [data-testid="stSidebar"] button[kind="primary"] span,
+    [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] p,
+    [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] span {
+        color: #4A0708 !important;
+        font-weight: 700 !important;
+    }
+    [data-testid="stSidebar"] button[kind="primary"]:hover,
+    [data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.05);
+        background: linear-gradient(180deg, #FFFBD6 0%, #FFD43B 100%) !important;
+    }
+    [data-testid="stSidebar"] button[kind="primary"]:active,
+    [data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:active {
+        transform: translateY(1px);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35) !important;
+    }
+    /* Nonaktif: tan redup seperti di desain Figma */
+    [data-testid="stSidebar"] button[kind="primary"]:disabled,
+    [data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:disabled {
+        background: #8F6A5E !important;
+        opacity: 1;
+        box-shadow: none !important;
+        transform: none;
+        filter: none;
+    }
+    [data-testid="stSidebar"] button[kind="primary"]:disabled p,
+    [data-testid="stSidebar"] button[kind="primary"]:disabled span,
+    [data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:disabled p,
+    [data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:disabled span {
+        color: #4A1410 !important;
+    }
+
+    /* ======================================================
+       TOMBOL UTAMA (halaman utama)
+       ====================================================== */
     button[kind="primary"], [data-testid="stBaseButton-primary"] {
         background-color: var(--rosewood) !important;
         border: 1px solid var(--rosewood) !important;
@@ -117,6 +722,114 @@ st.markdown(
     }
     button[kind="primary"]:disabled, [data-testid="stBaseButton-primary"]:disabled {
         opacity: 0.45;
+    }
+
+    /* ======================================================
+       PILL NAVIGATION  (tab utama + pilihan sumber data)
+       ====================================================== */
+    /* ---- Header: logo sejajar judul ---- */
+    .tsp-hero {
+        display: flex;
+        align-items: center;
+        gap: 1.1rem;
+        margin: 0.4rem 0 0.2rem 0;
+    }
+    .tsp-hero img {
+        height: 3.8rem;
+        width: auto;
+        flex-shrink: 0;
+        filter: drop-shadow(0 1px 2px rgba(107, 11, 12, 0.35));
+    }
+    .tsp-hero h1 {
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1.15 !important;
+    }
+
+    /* ---- Tab utama: kontrol segmented berikon (seperti Figma) ---- */
+    [role="tablist"] {
+        display: inline-flex !important;
+        width: fit-content !important;
+        max-width: 100%;
+        gap: 0.35rem;
+        padding: 0.4rem;
+        margin-bottom: 0.8rem;
+        background: #FFFFFF;
+        border: 1px solid rgba(45, 18, 13, 0.10) !important;
+        border-radius: 18px;
+        box-shadow: 0 2px 10px rgba(45, 18, 13, 0.08);
+        overflow: visible !important;
+        height: auto !important;
+    }
+    [data-baseweb="tab-highlight"],
+    [data-baseweb="tab-border"],
+    .react-aria-SelectionIndicator {
+        display: none !important;
+    }
+    [role="tab"] {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        height: auto;
+        padding: 0.65rem 1.3rem;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 13px;
+        box-shadow: none !important;
+        color: #6B4A3A;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+    [role="tab"] p,
+    [role="tab"] span,
+    [role="tab"] div {
+        color: #6B4A3A !important;
+        font-size: 1rem;
+        font-weight: 500;
+    }
+    [role="tab"]:hover {
+        background: rgba(107, 11, 12, 0.07) !important;
+    }
+    [role="tab"][aria-selected="true"] {
+        background: var(--rosewood) !important;
+        box-shadow: 0 3px 8px rgba(107, 11, 12, 0.30) !important;
+    }
+    [role="tab"][aria-selected="true"] p,
+    [role="tab"][aria-selected="true"] span,
+    [role="tab"][aria-selected="true"] div {
+        color: #FFFFFF !important;
+        font-weight: 600;
+    }
+
+    .st-key-input_type [role="radiogroup"] {
+        gap: 0.6rem;
+        flex-wrap: wrap;
+    }
+    .st-key-input_type label[data-baseweb="radio"] {
+        margin: 0 !important;
+        padding: 0.4rem 1.3rem;
+        background: #FFFFFF;
+        border: 1.5px solid var(--rosewood);
+        border-radius: 999px;
+        box-shadow: 0 1px 3px rgba(45, 18, 13, 0.10);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .st-key-input_type label[data-baseweb="radio"] > div:first-child {
+        display: none !important;
+    }
+    .st-key-input_type label[data-baseweb="radio"] p {
+        font-weight: 600;
+    }
+    .st-key-input_type label[data-baseweb="radio"]:hover {
+        background: var(--botticelli-soft);
+    }
+    .st-key-input_type label[data-baseweb="radio"]:has(input:checked) {
+        background: var(--rosewood);
+        box-shadow: 0 3px 8px rgba(107, 11, 12, 0.35);
+    }
+    .st-key-input_type label[data-baseweb="radio"]:has(input:checked) p {
+        color: #FFFFFF !important;
     }
 
     /* Kartu metrik */
@@ -138,11 +851,6 @@ st.markdown(
         color: var(--coffee);
     }
 
-    /* Tab */
-    button[data-baseweb="tab"] { font-weight: 600; color: var(--coffee); }
-    button[data-baseweb="tab"][aria-selected="true"] { color: var(--rosewood); }
-    [data-baseweb="tab-highlight"] { background-color: var(--rosewood) !important; }
-
     /* Expander */
     [data-testid="stExpander"] {
         border: 1px solid rgba(107, 11, 12, 0.18);
@@ -152,6 +860,29 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+
+# Warna grafik comparison (diterapkan di app.py agar utils/comparison.py
+# tidak perlu diubah)
+CHART_RED = "#6B0B0C"       # Final Distance & Execution Time
+CHART_YELLOW = "#FFFBCA"    # Solution Improvement
+
+
+def recolor(fig, color):
+    """Ubah warna batang pada grafik comparison."""
+
+    fig.update_traces(marker_color=color)
+
+    return fig
+
+
+def spacer(rem=1.0):
+    """Jarak vertikal tambahan."""
+
+    st.markdown(
+        f"<div style='height:{rem}rem'></div>",
+        unsafe_allow_html=True
+    )
 
 
 # ============================================================
@@ -385,6 +1116,9 @@ ALGORITHMS = {
 if "df" not in st.session_state:
     st.session_state.df = None
 
+if "dataset_name" not in st.session_state:
+    st.session_state.dataset_name = None
+
 if "independent_results" not in st.session_state:
     st.session_state.independent_results = []
 
@@ -451,7 +1185,7 @@ def extract_history(result):
 
 
 # ------------------------------------------------------------
-# INITIAL SOLUTION RESOLVER
+# INITIALIZATION RESOLVER
 # ------------------------------------------------------------
 
 def resolve_initial(
@@ -622,7 +1356,7 @@ def _edges(edges, labels):
 
 
 def _change(before, after):
-    """'284.48 ➔ 265.70  (−18.78)'"""
+    """'284.48 ➔ **265.70**  (−18.78)'  (angka hasil akhir dibold)"""
 
     delta = (
         None
@@ -630,7 +1364,7 @@ def _change(before, after):
         else float(after) - float(before)
     )
 
-    return f"{_f(before)} ➔ {_f(after)}  ({_signed(delta)})"
+    return f"{_f(before)} ➔ **{_f(after)}**  ({_signed(delta)})"
 
 
 def two_opt_move(route, i, j):
@@ -722,14 +1456,59 @@ def _view(history, k, blocks):
 
 
 def _result_block(history, k, labels, note=""):
-    """Blok pertama SEMUA algoritma: hasil iterasi ini."""
+    """Blok pertama SEMUA algoritma: hasil iterasi."""
 
     item = history[k]
 
-    return _lines("Hasil Iterasi Ini", [
-        ("Rute Saat Ini", route_text(_route_of(item), labels)),
-        ("Total Jarak", _f(item.get("distance")) + note),
+    return _lines("Hasil Iterasi", [
+        ("Rute", route_text(_route_of(item), labels)),
+        ("Total Jarak", f"**{_f(item.get('distance'))}**" + note),
     ])
+
+
+# Rute pada tabel iterasi dipersingkat bila lebih panjang dari ini
+ROUTE_TABLE_FULL_LIMIT = 60
+
+
+def route_text_table(route, labels):
+    """Teks rute untuk tabel iterasi; dipotong jika rute sangat panjang."""
+
+    if route is None or len(route) <= ROUTE_TABLE_FULL_LIMIT:
+        return route_text(route, labels)
+
+    head = " → ".join(labels[int(i)] for i in route[:5])
+    tail = " → ".join(labels[int(i)] for i in route[-3:])
+
+    return f"{head} → … → {tail}  ({len(route) - 1} node)"
+
+
+def _insertion_step(history, k, dist):
+    """
+    Node terpilih + posisi sisip + tambahan jarak untuk satu langkah
+    insertion, dihitung langsung dari dua rute berurutan (O(n)).
+    Dipakai tabel ringkas agar tetap cepat pada dataset besar.
+    """
+
+    cur = _route_of(history[k])
+
+    if k == 0:
+
+        return {"selected": cur[1], "after": None, "before": None, "increase": None}
+
+    prev_nodes = set(_route_of(history[k - 1]))
+
+    selected = next(v for v in cur[:-1] if v not in prev_nodes)
+
+    position = cur.index(selected)
+
+    after, before = cur[position - 1], cur[position + 1]
+
+    return {
+        "selected": selected,
+        "after": after,
+        "before": before,
+        "increase": dist[after][selected] + dist[selected][before] - dist[after][before],
+    }
 
 
 def _limit_rows(rows, limit=CANDIDATE_LIMIT):
@@ -1546,9 +2325,9 @@ def _tabu_view(history, k, dist, labels):
     pairs.append((
         "Jarak Terbaik Sejauh Ini",
         (
-            f"{_f(best_before)} ➔ {_f(best_after)}  (rekor baru)"
+            f"{_f(best_before)} ➔ **{_f(best_after)}**  (rekor baru)"
             if best_after < best_before
-            else f"{_f(best_before)}  (tidak berubah)"
+            else f"**{_f(best_before)}**  (tidak berubah)"
         ),
     ))
 
@@ -1762,7 +2541,7 @@ def _sa_view(history, k, dist, labels):
     pairs.append(("Perubahan Jarak", _change(distance_before, item.get("distance"))))
 
     if best_distance is not None:
-        pairs.append(("Jarak Terbaik Sejauh Ini", _f(best_distance)))
+        pairs.append(("Jarak Terbaik Sejauh Ini", f"**{_f(best_distance)}**"))
 
     blocks.append(_lines("Proses & Perhitungan", pairs))
 
@@ -1851,7 +2630,7 @@ def _generic_view(history, k, labels):
 def build_iteration_view(kind, history, k, dist, labels, strategy=None):
     """
     Detail iterasi ke-k dengan susunan yang sama untuk semua algoritma:
-        Hasil Iterasi Ini  ->  Proses & Perhitungan  ->  tabel (jika ada)
+        Hasil Iterasi  ->  Proses & Perhitungan  ->  tabel (jika ada)
 
     Return: {"title": str, "blocks": [ {"kind": "lines" | "table" | "text", ...} ]}
     """
@@ -1915,7 +2694,7 @@ def build_iteration_table(kind, history, dist, labels):
         row = {"Iterasi": str(item.get("iteration", k))}
 
         if route is not None:
-            row["Route"] = route_text(route, labels)
+            row["Route"] = route_text_table(route, labels)
 
         distance = item.get("distance")
 
@@ -1930,22 +2709,21 @@ def build_iteration_table(kind, history, dist, labels):
 
             if kind == "nn" and k > 0:
 
-                d = _derive_nn(history, k, dist)
-
-                row["Node dipilih"] = labels[d["selected"]]
+                # node yang dipilih = node terakhir pada rute iterasi ini
+                row["Node dipilih"] = labels[route[-1]]
 
             elif kind in ("ni", "fi", "ai"):
 
-                d = _derive_insertion(kind, history, k, dist)
+                step = _insertion_step(history, k, dist)
 
-                row["Node dipilih"] = labels[d["selected"]]
+                row["Node dipilih"] = labels[step["selected"]]
 
-                if d["type"] == "insert":
+                if step["after"] is not None:
 
                     row["Disisipkan antara"] = (
-                        f"{labels[d['after']]} dan {labels[d['before']]}"
+                        f"{labels[step['after']]} dan {labels[step['before']]}"
                     )
-                    row["Tambahan jarak"] = _f(d["increase"])
+                    row["Tambahan jarak"] = _f(step["increase"])
 
             elif kind == "local":
 
@@ -2088,6 +2866,13 @@ ALGORITHM_EXPLANATIONS = {
 # kecil-menengah agar history tidak membengkak.
 DETAIL_NODE_LIMIT = 100
 
+# 3-opt berkompleksitas O(n^3) per iterasi; di atas batas ini dianggap
+# terlalu lama (1000 node = beberapa menit untuk SATU iterasi).
+THREE_OPT_MAX_NODES = 150
+
+# Distance matrix hanya ditampilkan bila tidak terlalu besar
+DISTANCE_MATRIX_DISPLAY_LIMIT = 100
+
 
 # ------------------------------------------------------------
 # HISTORY
@@ -2162,7 +2947,7 @@ def find_route_in_step(df, item):
 def render_view(view):
     """Tampilkan hasil build_iteration_view() dengan susunan seragam."""
 
-    st.markdown(f"#### {view['title']}")
+    st.markdown(f"### {view['title']}")
 
     for block in view["blocks"]:
 
@@ -2172,7 +2957,7 @@ def render_view(view):
 
         elif block["kind"] == "lines":
 
-            st.markdown(f"**{block['heading']}**")
+            st.markdown(f"#### {block['heading']}")
 
             st.markdown(
                 "\n".join(
@@ -2183,7 +2968,7 @@ def render_view(view):
 
         elif block["kind"] == "table":
 
-            st.markdown(f"**{block['heading']}**")
+            st.markdown(f"#### {block['heading']}")
 
             if block.get("caption"):
                 st.caption(block["caption"])
@@ -2205,15 +2990,12 @@ def render_view(view):
 
 
 def highlight_selected_row(table, selected):
-    """Beri warna pada baris iterasi yang sedang dipilih."""
-
-    if selected < 0:
-        return table
+    """Warna kuning lembut pada baris iterasi terpilih; kolom Distance dibold."""
 
     def _color(row):
 
         style = (
-            "background-color: #CDE3E8; font-weight: 600"
+            "background-color: #FFFBCA; font-weight: 600"
             if row.name == selected
             else ""
         )
@@ -2221,7 +3003,20 @@ def highlight_selected_row(table, selected):
         return [style] * len(row)
 
     try:
-        return table.style.apply(_color, axis=1)
+
+        styled = table.style
+
+        if selected >= 0:
+            styled = styled.apply(_color, axis=1)
+
+        if "Distance" in table.columns:
+            styled = styled.set_properties(
+                subset=["Distance"],
+                **{"font-weight": "700"}
+            )
+
+        return styled
+
     except Exception:
         return table
 
@@ -2236,7 +3031,8 @@ def render_independent_result(
     result,
     index,
     key_prefix="independent",
-    run_id=None
+    run_id=None,
+    heading_level=3
 ):
     """
     Urutan tampilan:
@@ -2259,6 +3055,10 @@ def render_independent_result(
     )
 
     # -------------------- 1. judul + penjelasan --------------------
+    # Nama algoritma dibuat lebih kecil (h3) dari judul "Results" (h2),
+    # dengan jarak di atasnya.
+
+    spacer(0.8)
 
     st.subheader(method)
 
@@ -2347,7 +3147,7 @@ def render_independent_result(
 
     with col_table:
 
-        st.markdown("**Tabel Iterasi**")
+        st.markdown("#### Tabel Iterasi")
 
         if history:
 
@@ -2401,6 +3201,8 @@ def render_independent_result(
             )
 
     with col_viz:
+
+        st.markdown("#### Visualisasi Rute")
 
         plot_route_data = result["route"]
 
@@ -2621,6 +3423,14 @@ def execute_independent_algorithm(
     parameters=None
 ):
 
+    if method == "3-opt" and len(dist_matrix) > THREE_OPT_MAX_NODES:
+
+        raise ValueError(
+            f"3-opt terlalu berat untuk {len(dist_matrix)} node "
+            f"(kompleksitas O(n³); batas {THREE_OPT_MAX_NODES} node). "
+            "Gunakan 2-opt, Simulated Annealing, atau Tabu Search."
+        )
+
     start_time = time.perf_counter()
 
     result = run_algorithm(
@@ -2820,7 +3630,7 @@ def previous_route_algorithms(method, selected_algorithms):
 
 
 # ------------------------------------------------------------
-# PANEL: INITIAL SOLUTION (satu algoritma)
+# PANEL: INITIALIZATION (satu algoritma)
 # ------------------------------------------------------------
 
 def render_initial_panel(method, selected_algorithms, df):
@@ -3406,25 +4216,14 @@ def prepare_task_data(data):
     return df_task, dist, route
 
 
-def render_hybrid_placeholder():
-
-    st.subheader(
-        "Hybrid"
-    )
-
-    st.info(
-        "Masukkan dataset terlebih dahulu untuk menggunakan Hybrid."
-    )
-
-
 def render_tabu_task():
 
-    st.subheader("Tabu Search — Data Tugas")
+    st.header("Tabu Search — Data Tugas")
 
     st.caption(
-        "Tab khusus untuk data dari soal tugas. Tab ini tidak memakai "
+        "Halaman khusus untuk data dari soal tugas. Halaman ini tidak memakai "
         "dataset pada bagian Input Data dan tidak terpengaruh sidebar. "
-        "Tabu Search yang dipakai sama dengan tab lainnya."
+        "Tabu Search yang dipakai sama dengan mode lainnya."
     )
 
     data = TABU_TASK_DATA
@@ -3514,7 +4313,7 @@ def render_tabu_task():
         ) + ["Generate Random", "Manual"]
 
         source = st.selectbox(
-            "Initial solution",
+            "Initialization",
             source_options,
             key="tabutask_source"
         )
@@ -3676,7 +4475,7 @@ def render_tabu_task():
 # HYBRID
 # ============================================================
 #
-# Tahap 1: metode Constructive membangun initial solution.
+# Tahap 1: metode Constructive membangun initialization (rute awal).
 # Tahap 2: metode Optimization (Local Search / Metaheuristic)
 #          memperbaiki rute dari tahap 1.
 
@@ -3747,7 +4546,7 @@ def render_hybrid_result(df, dist_matrix, combo, index, run_id):
 
     st.divider()
 
-    st.markdown("### Tahap 1 — Initial Solution")
+    st.header("Tahap 1 — Initialization")
 
     render_independent_result(
         df,
@@ -3760,7 +4559,7 @@ def render_hybrid_result(df, dist_matrix, combo, index, run_id):
 
     st.divider()
 
-    st.markdown("### Tahap 2 — Optimization")
+    st.header("Tahap 2 — Optimization")
 
     render_independent_result(
         df,
@@ -3772,15 +4571,8 @@ def render_hybrid_result(df, dist_matrix, combo, index, run_id):
     )
 
 
-def render_hybrid(df, dist_matrix):
-
-    st.subheader("Hybrid")
-
-    st.caption(
-        "Gabungkan metode Constructive (membangun initial solution) dengan "
-        "metode Optimization (memperbaikinya). Rute hasil tahap 1 menjadi "
-        "initial route tahap 2."
-    )
+def hybrid_sidebar(df):
+    """Pengaturan Hybrid di sidebar. Return dict konteks untuk render_hybrid."""
 
     labels = df["node"].tolist()
 
@@ -3795,73 +4587,66 @@ def render_hybrid(df, dist_matrix):
     ]
 
 
-    # ---------------- 1. kombinasi ----------------
+    # ---------------- algoritma & kombinasi ----------------
 
-    st.markdown("#### 1. Pilih Kombinasi")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
+    with sidebar_section("Algorithm", ":material/route:"):
 
         inits = st.multiselect(
-            "Initial Solution (Constructive)",
+            "Initialization (Constructive)",
             constructive_methods,
-            key="hybrid_inits"
+            key="hybrid_inits",
+            placeholder="Pilih Initialization"
         )
-
-    with col2:
 
         optimizers = st.multiselect(
             "Optimization",
             optimizer_methods,
-            key="hybrid_optimizers"
+            key="hybrid_optimizers",
+            placeholder="Pilih Optimization"
         )
 
-    pairs = [(i, o) for i in inits for o in optimizers]
+        pairs = [(i, o) for i in inits for o in optimizers]
 
-    pair_labels = [f"{i} → {o}" for i, o in pairs]
+        pair_labels = [f"{i} → {o}" for i, o in pairs]
 
-    chosen_pairs = []
+        chosen_pairs = []
 
-    if pairs:
+        if pairs:
 
-        chosen_labels = st.multiselect(
-            "Kombinasi yang dijalankan",
-            pair_labels,
-            default=pair_labels,
-            key="hybrid_combinations",
-            help="Hapus kombinasi yang tidak ingin dijalankan."
-        )
-
-        chosen_pairs = [
-            pair
-            for pair, label in zip(pairs, pair_labels)
-            if label in chosen_labels
-        ]
-
-        if len(chosen_pairs) > HYBRID_MAX_COMBINATIONS:
-
-            st.warning(
-                f"Maksimal {HYBRID_MAX_COMBINATIONS} kombinasi sekaligus. "
-                "Kurangi pilihan kombinasi."
+            chosen_labels = st.multiselect(
+                "Kombinasi yang dijalankan",
+                pair_labels,
+                default=pair_labels,
+                key="hybrid_combinations",
+                help="Hapus kombinasi yang tidak ingin dijalankan."
             )
 
-            chosen_pairs = []
+            chosen_pairs = [
+                pair
+                for pair, label in zip(pairs, pair_labels)
+                if label in chosen_labels
+            ]
 
-    else:
+            if len(chosen_pairs) > HYBRID_MAX_COMBINATIONS:
 
-        st.caption(
-            "Pilih minimal satu Initial Solution dan satu Optimization."
-        )
+                st.warning(
+                    f"Maksimal {HYBRID_MAX_COMBINATIONS} kombinasi sekaligus. "
+                    "Kurangi pilihan kombinasi."
+                )
+
+                chosen_pairs = []
+
+        else:
+
+            st.info(
+                "Pilih minimal satu Initialization dan satu Optimization.",
+                icon=":material/info:"
+            )
 
 
-    # ---------------- 2. start node + parameter ----------------
+    # ---------------- initialization (start node) ----------------
 
-    col_start, col_params = st.columns(2)
-
-    with col_start:
-
-        st.markdown("#### 2. Start Node")
+    with sidebar_section("Initialization", ":material/adjust:"):
 
         start_choice = st.selectbox(
             "Start Node",
@@ -3893,6 +4678,9 @@ def render_hybrid(df, dist_matrix):
 
             start_note = None
 
+
+    # ---------------- parameter ----------------
+
     involved = list(dict.fromkeys(inits + optimizers))
 
     methods_with_parameters = [
@@ -3900,9 +4688,7 @@ def render_hybrid(df, dist_matrix):
         if ALGORITHMS[m]["parameters"]
     ]
 
-    with col_params:
-
-        st.markdown("#### 3. Parameters")
+    with sidebar_section("Parameters", ":material/layers:"):
 
         if not methods_with_parameters:
 
@@ -3924,13 +4710,52 @@ def render_hybrid(df, dist_matrix):
 
     # ---------------- run ----------------
 
-    if st.button(
-        "▶ Run Hybrid",
-        type="primary",
-        use_container_width=True,
-        disabled=not chosen_pairs,
-        key="hybrid_run_button"
-    ):
+    with sidebar_run_bar():
+
+        run = run_button(
+            "Run Hybrid",
+            type="primary",
+            disabled=not chosen_pairs,
+            key="hybrid_run_button"
+        )
+
+    return {
+        "chosen_pairs": chosen_pairs,
+        "start": start,
+        "start_note": start_note,
+        "involved": involved,
+        "run": run,
+    }
+
+
+def render_hybrid(df, dist_matrix, ctx):
+    """Halaman utama mode Hybrid (pengaturan ada di sidebar)."""
+
+    st.header("Hybrid")
+
+    st.caption(
+        "Gabungkan metode Constructive (membangun initialization) dengan "
+        "metode Optimization (memperbaikinya). Rute hasil tahap 1 menjadi "
+        "initial route tahap 2. Atur kombinasi, start node, dan parameter "
+        "di sidebar, lalu klik Run."
+    )
+
+    chosen_pairs = ctx["chosen_pairs"]
+    start = ctx["start"]
+    start_note = ctx["start_note"]
+    involved = ctx["involved"]
+
+    if not chosen_pairs:
+
+        st.info(
+            "Pilih minimal satu Initialization dan satu Optimization "
+            "pada sidebar."
+        )
+
+
+    # ---------------- run ----------------
+
+    if ctx["run"] and chosen_pairs:
 
         st.session_state.hybrid_run_id += 1
 
@@ -4009,7 +4834,9 @@ def render_hybrid(df, dist_matrix):
 
     st.divider()
 
-    st.subheader("Results")
+    st.header("Results")
+
+    spacer(0.5)
 
     result_tabs = st.tabs([r["label"] for r in results])
 
@@ -4042,7 +4869,7 @@ def render_hybrid(df, dist_matrix):
 
         st.divider()
 
-        st.subheader("Comparison")
+        st.header("Comparison")
 
         st.caption(
             "Hybrid dibandingkan satu sama lain dan dengan hasil "
@@ -4090,7 +4917,7 @@ def render_hybrid(df, dist_matrix):
         with col_c:
 
             st.plotly_chart(
-                plot_distance_comparison(comparison_df),
+                recolor(plot_distance_comparison(comparison_df), CHART_RED),
                 use_container_width=True,
                 key=f"hybrid_{run_id}_cmp_distance"
             )
@@ -4098,13 +4925,13 @@ def render_hybrid(df, dist_matrix):
         with col_d:
 
             st.plotly_chart(
-                plot_time_comparison(comparison_df),
+                recolor(plot_time_comparison(comparison_df), CHART_RED),
                 use_container_width=True,
                 key=f"hybrid_{run_id}_cmp_time"
             )
 
         st.plotly_chart(
-            plot_improvement_comparison(comparison_df),
+            recolor(plot_improvement_comparison(comparison_df), CHART_YELLOW),
             use_container_width=True,
             key=f"hybrid_{run_id}_cmp_improvement"
         )
@@ -4114,7 +4941,24 @@ def render_hybrid(df, dist_matrix):
 # HEADER
 # ============================================================
 
-st.title("🧭 TSP Learning & Optimization")
+# Logo halaman utama: logo transparan sejajar (rata tengah) dengan judul.
+_hero_uri = _logo_data_uri(520) if LOGO_PATH.exists() else None
+
+if _hero_uri:
+
+    st.markdown(
+        f"""
+        <div class="tsp-hero">
+            <img src="{_hero_uri}" alt="TSP"/>
+            <h1> Learning &amp; Optimization</h1>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+else:
+
+    st.title("Learning & Optimization")
 
 st.caption(
     "Media interaktif untuk membedah, menguji, dan membandingkan "
@@ -4124,693 +4968,800 @@ st.caption(
 
 
 # ============================================================
-# INPUT DATA
+# DATASET BAWAAN
 # ============================================================
+#
+# Dimuat SEKALI di awal (sebelum tab) supaya kedua tab dan sidebar
+# selalu memakai state yang sama. Cukup pilih algoritma lalu klik Run.
 
-st.header("📂 Input Data")
+if st.session_state.df is None and DATASET_SMALL.exists():
 
-input_type = st.radio(
-    "Pilih sumber data:",
-    ["Generate", "Upload", "Manual"],
-    horizontal=True
-)
+    try:
 
+        st.session_state.df = load_data(str(DATASET_SMALL))
 
-new_data = None
+        st.session_state.dataset_name = DATASET_SMALL_NAME
 
+    except Exception as e:
 
-# ------------------------------------------------------------
-# GENERATE
-# ------------------------------------------------------------
-
-if input_type == "Generate":
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-
-        n_nodes = st.number_input(
-            "Jumlah node",
-            min_value=3,
-            max_value=500,
-            value=10
-        )
-
-    with col2:
-
-        data_seed = st.number_input(
-            "Seed",
-            min_value=0,
-            value=42
-        )
-
-    with col3:
-
-        coordinate_range = st.number_input(
-            "Coordinate Range",
-            min_value=1,
-            value=100
+        st.warning(
+            f"Dataset bawaan ({DATASET_SMALL_NAME}) gagal dimuat: {e}"
         )
 
 
-    if st.button(
-        "Generate Dataset",
-        type="primary"
-    ):
+# ============================================================
+# TAB: TABU SEARCH (TUGAS) | EKSPERIMEN   (tampil sebagai pill)
+# ============================================================
+#
+# Memakai st.tabs asli (gayanya diubah jadi pill lewat CSS): isi KEDUA tab
+# dijalankan di setiap rerun, sehingga pengaturan sidebar, pilihan
+# algoritma, dan hasil tidak hilang ketika berpindah tab.
 
-        rng = random.Random(
-            int(data_seed)
-        )
+tab_tugas, tab_eksperimen = st.tabs([
+    ":material/layers: Tabu Search (Tugas)",
+    ":material/science: Eksperimen"
+])
 
-        new_data = pd.DataFrame({
+# Tab ini memakai data tugas sendiri, tidak butuh dataset di bawah
+with tab_tugas:
 
-            "node": [
-                chr(65 + i)
-                if i < 26
-                else f"N{i + 1}"
-                for i in range(
-                    int(n_nodes)
-                )
-            ],
-
-            "x": [
-                round(
-                    rng.uniform(
-                        0,
-                        coordinate_range
-                    ),
-                    2
-                )
-                for _ in range(
-                    int(n_nodes)
-                )
-            ],
-
-            "y": [
-                round(
-                    rng.uniform(
-                        0,
-                        coordinate_range
-                    ),
-                    2
-                )
-                for _ in range(
-                    int(n_nodes)
-                )
-            ]
-        })
+    render_tabu_task()
 
 
-# ------------------------------------------------------------
-# UPLOAD
-# ------------------------------------------------------------
+with tab_eksperimen:
 
-elif input_type == "Upload":
+    # ============================================================
+    # INPUT DATA
+    # ============================================================
 
-    uploaded_file = st.file_uploader(
-        "Upload CSV / Excel",
-        type=[
-            "csv",
-            "xlsx",
-            "xls"
-        ]
+    st.header("📂 Input Data")
+
+    input_type = st.pills(
+        "Pilih sumber data:",
+        ["Dataset Small", "Generate", "Upload", "Manual"],
+        default="Dataset Small",
+        key="input_type"
     )
 
-    if uploaded_file is not None:
+
+    new_data = None
+
+
+    # ------------------------------------------------------------
+    # DATASET SMALL (dataset/small.csv)
+    # ------------------------------------------------------------
+
+    if input_type == "Dataset Small":
+
+        if DATASET_SMALL.exists():
+
+            st.caption(
+                f"Memakai file `{DATASET_SMALL_NAME}` (kolom x, y tanpa header; "
+                "node diberi nomor otomatis mulai dari 0)."
+            )
+
+            if st.button(
+                "Gunakan Dataset Small",
+                type="primary"
+            ):
+
+                new_data = str(DATASET_SMALL)
+
+        else:
+
+            st.error(
+                f"File `{DATASET_SMALL_NAME}` tidak ditemukan. "
+                "Pastikan file ada di folder dataset/ pada repo."
+            )
+
+
+    # ------------------------------------------------------------
+    # GENERATE
+    # ------------------------------------------------------------
+
+    elif input_type == "Generate":
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+
+            n_nodes = st.number_input(
+                "Jumlah node",
+                min_value=3,
+                max_value=500,
+                value=10
+            )
+
+        with col2:
+
+            data_seed = st.number_input(
+                "Seed",
+                min_value=0,
+                value=42
+            )
+
+        with col3:
+
+            coordinate_range = st.number_input(
+                "Coordinate Range",
+                min_value=1,
+                value=100
+            )
+
+
+        if st.button(
+            "Generate Dataset",
+            type="primary"
+        ):
+
+            rng = random.Random(
+                int(data_seed)
+            )
+
+            new_data = pd.DataFrame({
+
+                "node": [
+                    chr(65 + i)
+                    if i < 26
+                    else f"N{i + 1}"
+                    for i in range(
+                        int(n_nodes)
+                    )
+                ],
+
+                "x": [
+                    round(
+                        rng.uniform(
+                            0,
+                            coordinate_range
+                        ),
+                        2
+                    )
+                    for _ in range(
+                        int(n_nodes)
+                    )
+                ],
+
+                "y": [
+                    round(
+                        rng.uniform(
+                            0,
+                            coordinate_range
+                        ),
+                        2
+                    )
+                    for _ in range(
+                        int(n_nodes)
+                    )
+                ]
+            })
+
+
+    # ------------------------------------------------------------
+    # UPLOAD
+    # ------------------------------------------------------------
+
+    elif input_type == "Upload":
+
+        uploaded_file = st.file_uploader(
+            "Upload CSV / Excel",
+            type=[
+                "csv",
+                "xlsx",
+                "xls"
+            ]
+        )
+
+        if uploaded_file is not None:
+
+            if st.button(
+                "Gunakan Dataset",
+                type="primary"
+            ):
+
+                new_data = uploaded_file
+
+
+    # ------------------------------------------------------------
+    # MANUAL
+    # ------------------------------------------------------------
+
+    else:
+
+        if "manual_data" not in st.session_state:
+
+            st.session_state.manual_data = pd.DataFrame({
+                "node": ["A", "B", "C", "D", "E"],
+                "x": [10, 50, 90, 70, 30],
+                "y": [20, 80, 40, 60, 90]
+            })
+
+
+        edited_data = st.data_editor(
+            st.session_state.manual_data,
+            num_rows="dynamic",
+            use_container_width=True
+        )
+
 
         if st.button(
             "Gunakan Dataset",
             type="primary"
         ):
 
-            new_data = uploaded_file
+            new_data = edited_data
 
 
-# ------------------------------------------------------------
-# MANUAL
-# ------------------------------------------------------------
+    # ============================================================
+    # LOAD DATA
+    # ============================================================
 
-else:
+    if new_data is not None:
 
-    if "manual_data" not in st.session_state:
+        try:
 
-        st.session_state.manual_data = pd.DataFrame({
-            "node": ["A", "B", "C", "D", "E"],
-            "x": [10, 50, 90, 70, 30],
-            "y": [20, 80, 40, 60, 90]
-        })
+            st.session_state.df = load_data(
+                new_data
+            )
 
+            if isinstance(new_data, str):
+                st.session_state.dataset_name = DATASET_SMALL_NAME
+            elif hasattr(new_data, "name"):
+                st.session_state.dataset_name = str(new_data.name)
+            else:
+                st.session_state.dataset_name = input_type
 
-    edited_data = st.data_editor(
-        st.session_state.manual_data,
-        num_rows="dynamic",
-        use_container_width=True
-    )
+            st.session_state.independent_results = []
+            st.session_state.hybrid_results = []
 
+            st.success(
+                "Dataset berhasil digunakan."
+            )
 
-    if st.button(
-        "Gunakan Dataset",
-        type="primary"
-    ):
+            st.rerun()
 
-        new_data = edited_data
+        except Exception as e:
 
-
-# ============================================================
-# LOAD DATA
-# ============================================================
-
-if new_data is not None:
-
-    try:
-
-        st.session_state.df = load_data(
-            new_data
-        )
-
-        st.session_state.independent_results = []
-        st.session_state.hybrid_results = []
-
-        st.success(
-            "Dataset berhasil digunakan."
-        )
-
-        st.rerun()
-
-    except Exception as e:
-
-        st.error(
-            f"Gagal membaca dataset: {e}"
-        )
+            st.error(
+                f"Gagal membaca dataset: {e}"
+            )
 
 
-# Stop kalau belum ada data
+    # Stop kalau belum ada data (sidebar tetap tampil agar tidak "hilang")
 
-if st.session_state.df is None:
+    if st.session_state.df is None:
 
-    st.divider()
+        with st.sidebar:
 
-    tab_independent, tab_hybrid, tab_tabu_task = st.tabs([
-        "Independent",
-        "Hybrid",
-        "Tabu Search (Tugas)"
-    ])
+            render_sidebar_brand()
 
-    with tab_independent:
+            with sidebar_section("Pengaturan", ":material/tune:"):
+
+                st.info("Masukkan dataset terlebih dahulu.")
+
+        st.divider()
 
         st.info(
             "Masukkan dataset terlebih dahulu."
         )
 
-    with tab_hybrid:
-
-        render_hybrid_placeholder()
-
-    # Tab ini memakai data tugas sendiri, tidak butuh dataset di atas
-    with tab_tabu_task:
-
-        render_tabu_task()
-
-    st.stop()
+        st.stop()
 
 
-df = st.session_state.df
+    df = st.session_state.df
 
 
-# ============================================================
-# VIEW DATA
-# ============================================================
+    # ============================================================
+    # VIEW DATA
+    # ============================================================
 
-st.divider()
+    st.divider()
 
-st.header("📊 Data & Visualization")
+    st.header("📊 Data & Visualization")
 
-col1, col2 = st.columns(2)
-
-
-with col1:
-
-    st.subheader("Dataset")
-
-    st.dataframe(
-        df,
-        use_container_width=True,
-        hide_index=True
-    )
-
-
-with col2:
-
-    st.subheader("Node Distribution")
-
-    # home=-1: tidak ada node yang ditandai merah, karena
-    # start node ditentukan per algoritma pada sidebar.
-    fig_nodes = plot_nodes(
-        df,
-        home=-1
-    )
-
-    st.plotly_chart(
-        fig_nodes,
-        use_container_width=True
-    )
-
-
-# ============================================================
-# DISTANCE METHOD
-# ============================================================
-
-st.divider()
-
-st.header("📐 Distance Matrix")
-
-distance_method = st.radio(
-    "Distance Method",
-    ["Euclidean", "Manhattan"],
-    horizontal=True
-)
-
-
-distance_metric = (
-    "euclidean"
-    if distance_method == "Euclidean"
-    else "manhattan"
-)
-
-
-coords = list(
-    zip(
-        df["x"],
-        df["y"]
-    )
-)
-
-
-dist_matrix = build_distance_matrix(
-    coords,
-    metric=distance_metric
-)
-
-
-with st.expander(
-    "View Distance Matrix"
-):
-
-    st.dataframe(
-        pd.DataFrame(
-            dist_matrix,
-            index=df["node"],
-            columns=df["node"]
-        ),
-        use_container_width=True
-    )
-
-
-# ============================================================
-# MAIN MODE
-# ============================================================
-
-st.divider()
-
-tab_independent, tab_hybrid, tab_tabu_task = st.tabs([
-    "Independent",
-    "Hybrid",
-    "Tabu Search (Tugas)"
-])
-
-
-# ============================================================
-# INDEPENDENT SIDEBAR
-# ============================================================
-
-with st.sidebar:
-
-    # Judul + garis dalam satu wadah agar jaraknya rapat
-    try:
-        title_box = st.container(key="sidebar_title")
-    except TypeError:          # Streamlit versi lama (tanpa parameter key)
-        title_box = st.container()
-
-    with title_box:
-
-        st.header("Independent")
-
-        st.divider()
-
-    # --------------------------------------------------------
-    # ALGORITHM
-    # --------------------------------------------------------
-
-    st.subheader("Algorithm")
-
-    selected_algorithms = st.multiselect(
-        "Pilih satu atau beberapa algoritma:",
-        list(ALGORITHMS.keys()),
-        key="independent_algorithm_selection"
-    )
-
-    # Selalu didefinisikan agar tidak NameError saat Run
-    initial_solutions = {}
-    algorithm_parameters = {}
-
-
-    if selected_algorithms:
-
-        # ====================================================
-        # INITIAL SOLUTION  (pilih algoritma → ubah)
-        # ====================================================
-
-        st.divider()
-
-        st.subheader("Initial Solution")
-
-        active_initial = st.radio(
-            "Pilih algoritma:",
-            selected_algorithms,
-            horizontal=True,
-            key="independent_active_initial"
+    st.caption(
+        f"Dataset aktif: {len(df)} node"
+        + (
+            f" ({st.session_state.dataset_name})"
+            if st.session_state.dataset_name
+            else ""
         )
+        + "."
+    )
 
-        render_initial_panel(
-            active_initial,
-            selected_algorithms,
-            df
+    col1, col2 = st.columns(2)
+
+
+    with col1:
+
+        st.subheader("Dataset")
+
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True
         )
 
 
-        # ====================================================
-        # PARAMETERS  (pilih algoritma → ubah)
-        # ====================================================
+    with col2:
 
-        st.divider()
+        st.subheader("Node Distribution")
 
-        st.subheader("Parameters")
+        # home=-1: tidak ada node yang ditandai merah, karena
+        # start node ditentukan per algoritma pada sidebar.
+        fig_nodes = plot_nodes(
+            df,
+            home=-1
+        )
 
-        methods_with_parameters = [
-            method
-            for method in selected_algorithms
-            if ALGORITHMS[method]["parameters"]
-        ]
+        st.plotly_chart(
+            fig_nodes,
+            use_container_width=True
+        )
 
-        if not methods_with_parameters:
+
+    # ============================================================
+    # DISTANCE METHOD
+    # ============================================================
+
+    st.divider()
+
+    st.header("📐 Distance Matrix")
+
+    distance_method = st.radio(
+        "Distance Method",
+        ["Euclidean", "Manhattan"],
+        horizontal=True
+    )
+
+
+    distance_metric = (
+        "euclidean"
+        if distance_method == "Euclidean"
+        else "manhattan"
+    )
+
+
+    coords = list(
+        zip(
+            df["x"],
+            df["y"]
+        )
+    )
+
+
+    @st.cache_data(show_spinner="Menghitung distance matrix…")
+    def cached_distance_matrix(coords_tuple, metric):
+
+        return build_distance_matrix(
+            list(coords_tuple),
+            metric=metric
+        )
+
+
+    dist_matrix = cached_distance_matrix(
+        tuple(coords),
+        distance_metric
+    )
+
+
+    with st.expander(
+        "View Distance Matrix"
+    ):
+
+        if len(df) > DISTANCE_MATRIX_DISPLAY_LIMIT:
 
             st.caption(
-                "Algoritma yang dipilih tidak memiliki parameter."
+                f"Matriks {len(df)} × {len(df)} terlalu besar untuk "
+                f"ditampilkan (batas {DISTANCE_MATRIX_DISPLAY_LIMIT} node)."
             )
 
         else:
 
-            active_parameters = st.radio(
-                "Pilih algoritma:",
-                methods_with_parameters,
-                horizontal=True,
-                key="independent_active_parameters"
+            st.dataframe(
+                pd.DataFrame(
+                    dist_matrix,
+                    index=df["node"],
+                    columns=df["node"]
+                ),
+                use_container_width=True
             )
 
-            render_parameter_panel(active_parameters)
 
+    # ============================================================
+    # SIDEBAR (mode Independent / Hybrid)
+    # ============================================================
 
-        # Pengaturan SEMUA algoritma terpilih dibaca dari
-        # penyimpanan (bukan hanya yang sedang tampil).
-        initial_solutions = build_initial_solutions(
-            selected_algorithms,
-            df
-        )
-
-        algorithm_parameters = build_algorithm_parameters(
-            selected_algorithms
-        )
-
-
-    # --------------------------------------------------------
-    # RUN
-    # --------------------------------------------------------
+    # Selalu didefinisikan agar tidak NameError saat Run
+    run_independent = False
+    selected_algorithms = []
+    initial_solutions = {}
+    algorithm_parameters = {}
+    hybrid_ctx = None
 
     st.divider()
 
-    run_independent = st.button(
-        "▶ Run Independent",
-        type="primary",
-        use_container_width=True,
-        disabled=not selected_algorithms,
-        key="independent_run_button"
-    )
+    with st.sidebar:
+
+        render_sidebar_brand()
+
+        # --------------------------------------------------------
+        # PENGATURAN  (Mode: Independent / Hybrid)
+        # --------------------------------------------------------
+
+        with sidebar_section("Pengaturan", ":material/tune:"):
+
+            mode = st.radio(
+                "Mode",
+                ["Independent", "Hybrid"],
+                key="run_mode",
+                help=(
+                    "Independent: tiap algoritma berjalan sendiri. "
+                    "Hybrid: Constructive dilanjutkan Optimization."
+                )
+            )
 
 
-# ============================================================
-# INDEPENDENT CONTENT
-# ============================================================
+        # ========================================================
+        # MODE INDEPENDENT
+        # ========================================================
 
-with tab_independent:
+        if mode == "Independent":
 
-    st.subheader(
-        "Independent Algorithms"
-    )
+            # --------------------------------------------------------
+            # ALGORITHM
+            # --------------------------------------------------------
 
-    st.caption(
-        "Setiap algoritma berjalan secara independen "
-        "menggunakan input awalnya masing-masing. "
-        "Atur algoritma, initial solution, dan parameter di sidebar, "
-        "lalu klik Run."
-    )
+            with sidebar_section("Algorithm", ":material/route:"):
 
+                selected_algorithms = st.multiselect(
+                    "Pilih satu atau beberapa algoritma:",
+                    list(ALGORITHMS.keys()),
+                    key="independent_algorithm_selection"
+                )
 
-    if not selected_algorithms:
-
-        st.info(
-            "Pilih minimal satu algoritma pada sidebar."
-        )
+            # Selalu didefinisikan agar tidak NameError saat Run
+            initial_solutions = {}
+            algorithm_parameters = {}
 
 
-    # ========================================================
-    # RUN
-    # ========================================================
+            if selected_algorithms:
 
-    if run_independent and selected_algorithms:
+                # ====================================================
+                # INITIALIZATION  (pilih algoritma → ubah)
+                # ====================================================
 
-        results = []
+                with sidebar_section("Initialization", ":material/adjust:"):
 
-        # Reset pilihan iterasi pada hasil sebelumnya
-        st.session_state.independent_run_id += 1
+                    active_initial = st.radio(
+                        "Pilih algoritma:",
+                        selected_algorithms,
+                        horizontal=True,
+                        key="independent_active_initial"
+                    )
+
+                    render_initial_panel(
+                        active_initial,
+                        selected_algorithms,
+                        df
+                    )
 
 
-        # ----------------------------------------------------
-        # RUN EACH ALGORITHM INDEPENDENTLY
-        # ----------------------------------------------------
+                # ====================================================
+                # PARAMETERS  (pilih algoritma → ubah)
+                # ====================================================
 
-        for method in selected_algorithms:
+                with sidebar_section("Parameters", ":material/layers:"):
 
-            try:
+                    methods_with_parameters = [
+                        method
+                        for method in selected_algorithms
+                        if ALGORITHMS[method]["parameters"]
+                    ]
 
-                start_node, initial_route = resolve_initial(
-                    method,
-                    initial_solutions,
+                    if not methods_with_parameters:
+
+                        st.caption(
+                            "Algoritma yang dipilih tidak memiliki parameter."
+                        )
+
+                    else:
+
+                        active_parameters = st.radio(
+                            "Pilih algoritma:",
+                            methods_with_parameters,
+                            horizontal=True,
+                            key="independent_active_parameters"
+                        )
+
+                        render_parameter_panel(active_parameters)
+
+
+                # Pengaturan SEMUA algoritma terpilih dibaca dari
+                # penyimpanan (bukan hanya yang sedang tampil).
+                initial_solutions = build_initial_solutions(
+                    selected_algorithms,
+                    df
+                )
+
+                algorithm_parameters = build_algorithm_parameters(
                     selected_algorithms
                 )
 
-                if (
-                    ALGORITHMS[method]["needs_start_node"]
-                    and start_node is None
-                ):
 
-                    raise ValueError(
-                        "Start Node belum dipilih."
-                    )
+            # --------------------------------------------------------
+            # RUN  (menempel di dasar sidebar)
+            # --------------------------------------------------------
 
-                if (
-                    ALGORITHMS[method]["needs_initial_route"]
-                    and initial_route is None
-                ):
+            with sidebar_run_bar():
 
-                    raise ValueError(
-                        "Starting Route belum lengkap."
-                    )
+                run_independent = run_button(
+                    "Run Independent",
+                    type="primary",
+                    disabled=not selected_algorithms,
+                    key="independent_run_button"
+                )
 
-                parameters = dict(
-                    algorithm_parameters.get(
+
+        # ========================================================
+        # MODE HYBRID
+        # ========================================================
+
+        else:
+
+            hybrid_ctx = hybrid_sidebar(df)
+
+
+    # ============================================================
+    # INDEPENDENT CONTENT
+    # ============================================================
+
+    if mode == "Independent":
+
+        st.header(
+            "Independent Algorithms"
+        )
+
+        st.caption(
+            "Setiap algoritma berjalan secara independen "
+            "menggunakan input awalnya masing-masing. "
+            "Atur algoritma, initialization, dan parameter di sidebar, "
+            "lalu klik Run."
+        )
+
+
+        if not selected_algorithms:
+
+            st.info(
+                "Pilih minimal satu algoritma pada sidebar."
+            )
+
+
+        # ========================================================
+        # RUN
+        # ========================================================
+
+        if run_independent and selected_algorithms:
+
+            results = []
+
+            # Reset pilihan iterasi pada hasil sebelumnya
+            st.session_state.independent_run_id += 1
+
+
+            # ----------------------------------------------------
+            # RUN EACH ALGORITHM INDEPENDENTLY
+            # ----------------------------------------------------
+
+            for method in selected_algorithms:
+
+                try:
+
+                    start_node, initial_route = resolve_initial(
                         method,
-                        {}
+                        initial_solutions,
+                        selected_algorithms
                     )
-                )
 
-                # Agar detail per iterasi (mis. semua kandidat
-                # Tabu Search) tersedia untuk dataset kecil-menengah.
-                if (
-                    "verbose_history"
-                    in ALGORITHMS[method]["parameters"]
-                    and len(df) <= DETAIL_NODE_LIMIT
-                ):
+                    if (
+                        ALGORITHMS[method]["needs_start_node"]
+                        and start_node is None
+                    ):
 
-                    parameters["verbose_history"] = True
+                        raise ValueError(
+                            "Start Node belum dipilih."
+                        )
 
-                result = execute_independent_algorithm(
-                    method=method,
-                    df=df,
-                    dist_matrix=dist_matrix,
-                    start_node=start_node,
-                    initial_route=initial_route,
-                    parameters=parameters
-                )
+                    if (
+                        ALGORITHMS[method]["needs_initial_route"]
+                        and initial_route is None
+                    ):
 
-                result["start_note"] = start_note_of(
-                    method,
-                    initial_solutions
-                )
+                        raise ValueError(
+                            "Starting Route belum lengkap."
+                        )
 
-                results.append(
-                    result
-                )
+                    parameters = dict(
+                        algorithm_parameters.get(
+                            method,
+                            {}
+                        )
+                    )
 
+                    # Agar detail per iterasi (mis. semua kandidat
+                    # Tabu Search) tersedia untuk dataset kecil-menengah.
+                    if (
+                        "verbose_history"
+                        in ALGORITHMS[method]["parameters"]
+                        and len(df) <= DETAIL_NODE_LIMIT
+                    ):
 
-            except Exception as e:
+                        parameters["verbose_history"] = True
 
-                st.error(
-                    f"{method} gagal dijalankan: {e}"
-                )
+                    result = execute_independent_algorithm(
+                        method=method,
+                        df=df,
+                        dist_matrix=dist_matrix,
+                        start_node=start_node,
+                        initial_route=initial_route,
+                        parameters=parameters
+                    )
 
+                    result["start_note"] = start_note_of(
+                        method,
+                        initial_solutions
+                    )
 
-        st.session_state.independent_results = (
-            results
-        )
-
-
-    # ========================================================
-    # RESULTS
-    # ========================================================
-
-    results = st.session_state.independent_results
-
-
-    if results:
-
-        st.divider()
-
-        st.subheader(
-            "Results"
-        )
+                    results.append(
+                        result
+                    )
 
 
-        for i, result in enumerate(results):
+                except Exception as e:
 
-            render_independent_result(
-                df,
-                dist_matrix,
-                result,
-                i
-            )
-
-            if i < len(results) - 1:
-
-                st.divider()
+                    st.error(
+                        f"{method} gagal dijalankan: {e}"
+                    )
 
 
-        # ====================================================
-        # COMPARISON
-        # ====================================================
-
-        if len(results) >= 2:
-
-            st.divider()
-
-            st.subheader(
-                "Comparison"
-            )
-
-            comparison_df = create_comparison_table(
+            st.session_state.independent_results = (
                 results
             )
 
-            comparison_df = sort_by_distance(
-                comparison_df
+
+        # ========================================================
+        # RESULTS
+        # ========================================================
+
+        results = st.session_state.independent_results
+
+
+        if results:
+
+            st.divider()
+
+            st.header(
+                "Results"
             )
 
-            st.dataframe(
-                comparison_df,
-                use_container_width=True,
-                hide_index=True
-            )
+            spacer(0.5)
 
 
-            col1, col2 = st.columns(2)
+            for i, result in enumerate(results):
+
+                render_independent_result(
+                    df,
+                    dist_matrix,
+                    result,
+                    i
+                )
+
+                if i < len(results) - 1:
+
+                    st.divider()
 
 
-            with col1:
+            # ====================================================
+            # COMPARISON
+            # ====================================================
 
-                best = get_best_distance(
+            if len(results) >= 2:
+
+                st.divider()
+
+                st.header(
+                    "Comparison"
+                )
+
+                comparison_df = create_comparison_table(
+                    results
+                )
+
+                comparison_df = sort_by_distance(
                     comparison_df
                 )
 
-                if best is not None:
+                st.dataframe(
+                    comparison_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
 
-                    st.metric(
-                        "Best Distance",
-                        best["Method"],
-                        f"{best['Final Distance']:.2f}"
+
+                col1, col2 = st.columns(2)
+
+
+                with col1:
+
+                    best = get_best_distance(
+                        comparison_df
+                    )
+
+                    if best is not None:
+
+                        st.metric(
+                            "Best Distance",
+                            best["Method"],
+                            f"{best['Final Distance']:.2f}"
+                        )
+
+
+                with col2:
+
+                    fastest = get_fastest_method(
+                        comparison_df
+                    )
+
+                    if fastest is not None:
+
+                        st.metric(
+                            "Fastest",
+                            fastest["Method"],
+                            f"{fastest['Execution Time (ms)']:.3f} ms"
+                        )
+
+
+                col1, col2 = st.columns(2)
+
+
+                with col1:
+
+                    st.plotly_chart(
+                        recolor(
+                            plot_distance_comparison(comparison_df),
+                            CHART_RED
+                        ),
+                        use_container_width=True,
+                        key="independent_cmp_distance"
                     )
 
 
-            with col2:
+                with col2:
 
-                fastest = get_fastest_method(
-                    comparison_df
-                )
-
-                if fastest is not None:
-
-                    st.metric(
-                        "Fastest",
-                        fastest["Method"],
-                        f"{fastest['Execution Time (ms)']:.3f} ms"
+                    st.plotly_chart(
+                        recolor(
+                            plot_time_comparison(comparison_df),
+                            CHART_RED
+                        ),
+                        use_container_width=True,
+                        key="independent_cmp_time"
                     )
 
 
-            col1, col2 = st.columns(2)
-
-
-            with col1:
-
                 st.plotly_chart(
-                    plot_distance_comparison(
-                        comparison_df
+                    recolor(
+                        plot_improvement_comparison(comparison_df),
+                        CHART_YELLOW
                     ),
                     use_container_width=True,
-                    key="independent_cmp_distance"
+                    key="independent_cmp_improvement"
                 )
 
 
-            with col2:
+    # ============================================================
+    # HYBRID
+    # ============================================================
 
-                st.plotly_chart(
-                    plot_time_comparison(
-                        comparison_df
-                    ),
-                    use_container_width=True,
-                    key="independent_cmp_time"
-                )
+    else:
 
-
-            st.plotly_chart(
-                plot_improvement_comparison(
-                    comparison_df
-                ),
-                use_container_width=True,
-                key="independent_cmp_improvement"
-            )
-
-
-# ============================================================
-# HYBRID
-# ============================================================
-
-with tab_hybrid:
-
-    render_hybrid(df, dist_matrix)
-
-
-# ============================================================
-# TABU SEARCH (DATA TUGAS)
-# ============================================================
-
-with tab_tabu_task:
-
-    render_tabu_task()
+        render_hybrid(df, dist_matrix, hybrid_ctx)
