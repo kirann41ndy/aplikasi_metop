@@ -131,7 +131,7 @@ def plot_route(
             y=ys,
             mode="lines",
             line=dict(
-                color="#6B0B0C",
+                color="#2D120D",
                 width=3
             ),
             hoverinfo="skip",
