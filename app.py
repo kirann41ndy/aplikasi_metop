@@ -3075,7 +3075,20 @@ def render_independent_result(
         "#### Hasil Terbaik" if is_improvement else "#### Hasil Akhir"
     )
 
-    col1, col2, col3 = st.columns(3)
+    # Improvement hanya relevan untuk algoritma non-constructive
+    # (yang punya initial route / initial distance).
+    show_improvement = (
+        is_improvement
+        and result["initial_distance"] is not None
+    )
+
+    if show_improvement:
+
+        col1, col2, col_imp, col3 = st.columns(4)
+
+    else:
+
+        col1, col2, col3 = st.columns(3)
 
     with col1:
 
@@ -3092,6 +3105,24 @@ def render_independent_result(
             "Final Distance",
             f"{result['final_distance']:.2f}"
         )
+
+    if show_improvement:
+
+        with col_imp:
+
+            initial_distance = result["initial_distance"]
+
+            improvement = (
+                (initial_distance - result["final_distance"])
+                / initial_distance * 100
+                if initial_distance
+                else 0.0
+            )
+
+            st.metric(
+                "Improvement",
+                f"{improvement:.2f}%"
+            )
 
     with col3:
 
