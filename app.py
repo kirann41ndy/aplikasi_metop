@@ -319,8 +319,16 @@ st.markdown(
         color: rgba(255, 255, 255, 0.62) !important;
         font-size: 0.8rem !important;
     }
-    [data-testid="stSidebar"] [data-testid="stTooltipIcon"] svg {
-        color: rgba(255, 255, 255, 0.6);
+    [data-testid="stSidebar"] [data-testid="stTooltipIcon"] svg,
+    [data-testid="stSidebar"] label svg,
+    [data-testid="stSidebar"] .stTooltipIcon svg {
+        fill: #E2EDF0 !important;
+        color: #E2EDF0 !important;
+    }
+    
+    [data-testid="stSidebar"] [data-testid="stTooltipIcon"] svg path,
+    [data-testid="stSidebar"] label svg path {
+        fill: #E2EDF0 !important;
     }
 
     /* ---- Kotak info / peringatan ---- */
@@ -3309,6 +3317,314 @@ def render_independent_result(
 
 
 # ============================================================
+# EXPORT LAPORAN (satu teks Markdown siap salin)
+# ============================================================
+
+def _md_cell(value):
+
+    if isinstance(value, float):
+        value = f"{value:.3f}"
+
+    return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def df_to_markdown(table):
+    """DataFrame -> tabel Markdown (tanpa dependensi tabulate)."""
+
+    if table is None or len(table) == 0:
+        return "(kosong)"
+
+    columns = [str(c) for c in table.columns]
+
+    lines = [
+        "| " + " | ".join(columns) + " |",
+        "| " + " | ".join("---" for _ in columns) + " |",
+    ]
+
+    for row in table.itertuples(index=False):
+        lines.append("| " + " | ".join(_md_cell(v) for v in row) + " |")
+
+    return "\n".join(lines)
+
+
+def view_to_markdown(view):
+    """Hasil build_iteration_view() -> teks Markdown."""
+
+    out = [f"**{view['title']}**", ""]
+
+    for block in view["blocks"]:
+
+        if block["kind"] == "text":
+
+            out += [block["text"], ""]
+
+        elif block["kind"] == "lines":
+
+            out += [f"*{block['heading']}*", ""]
+            out += [f"- **{label}**: {value}" for label, value in block["lines"]]
+            out.append("")
+
+        elif block["kind"] == "table":
+
+            out += [f"*{block['heading']}*", ""]
+
+            if block.get("caption"):
+                out += [block["caption"], ""]
+
+            out += [df_to_markdown(block["df"]), ""]
+
+    return "\n".join(out)
+
+
+def report_header(title, dataset_name, n_nodes, metric):
+
+    return [
+        f"# {title}",
+        "",
+        f"- **Dataset**: {dataset_name or '-'} ({n_nodes} node)",
+        f"- **Metode jarak**: {metric}",
+        "",
+    ]
+
+
+def result_to_markdown(df, dist_matrix, result, level=2, include_detail=False):
+    """Satu algoritma: ringkasan + tabel iterasi (+ detail per iterasi)."""
+
+    method = result["method"]
+    history = result.get("history") or []
+    labels = df["node"].astype(str).tolist()
+    kind = method_kind(method)
+    params = result.get("parameters") or {}
+
+    is_improvement = ALGORITHMS[method]["type"] in (
+        "Local Search",
+        "Metaheuristic"
+    )
+
+    start_label = labels[int(result["route"][0])]
+    start_note = result.get("start_note")
+
+    lines = [f"{'#' * level} {method}", ""]
+
+    shown_params = {k: v for k, v in params.items() if k != "verbose_history"}
+
+    if shown_params:
+        lines.append(
+            "- **Parameter**: "
+            + ", ".join(f"{k} = {v}" for k, v in shown_params.items())
+        )
+
+    lines.append(
+        f"- **Start Node**: {start_label}"
+        + (f" ({start_note})" if start_note else "")
+    )
+
+    if result["initial_route"] is not None:
+
+        lines.append(
+            f"- **Initial Route**: {route_to_labels(df, result['initial_route'])}"
+        )
+        lines.append(f"- **Initial Distance**: {result['initial_distance']:.2f}")
+
+    lines.append(f"- **Route**: {route_to_labels(df, result['route'])}")
+    lines.append(f"- **Final Distance**: {result['final_distance']:.2f}")
+
+    if is_improvement and result["initial_distance"]:
+
+        gain = (
+            (result["initial_distance"] - result["final_distance"])
+            / result["initial_distance"] * 100
+        )
+
+        lines.append(f"- **Improvement**: {gain:.2f}%")
+
+    lines.append(
+        f"- **Execution Time**: {result['execution_time'] * 1000:.3f} ms"
+    )
+
+    if history:
+
+        table = build_iteration_table(kind, history, dist_matrix, labels)
+
+        lines += ["", "**Tabel Iterasi**", "", df_to_markdown(table)]
+
+        if include_detail:
+
+            lines += ["", "**Detail Perhitungan per Iterasi**", ""]
+
+            for k in range(len(history)):
+
+                view = build_iteration_view(
+                    kind,
+                    history,
+                    k,
+                    dist_matrix,
+                    labels,
+                    strategy=params.get("strategy")
+                )
+
+                lines += [view_to_markdown(view), ""]
+
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+def independent_report(df, dist_matrix, results, include_detail=False):
+
+    lines = report_header(
+        "Laporan Hasil Eksperimen — Independent",
+        st.session_state.get("dataset_name"),
+        len(df),
+        st.session_state.get("distance_method", "Euclidean")
+    )
+
+    for result in results:
+
+        lines.append(
+            result_to_markdown(df, dist_matrix, result, 2, include_detail)
+        )
+
+    if len(results) >= 2:
+
+        comparison_df = sort_by_distance(create_comparison_table(results))
+
+        lines += ["## Comparison", "", df_to_markdown(comparison_df), ""]
+
+    return "\n".join(lines)
+
+
+def hybrid_report(df, dist_matrix, results, include_detail=False):
+
+    lines = report_header(
+        "Laporan Hasil Eksperimen — Hybrid",
+        st.session_state.get("dataset_name"),
+        len(df),
+        st.session_state.get("distance_method", "Euclidean")
+    )
+
+    for combo in results:
+
+        s1, s2 = combo["stage1"], combo["stage2"]
+
+        gain = (
+            (combo["initial_distance"] - combo["final_distance"])
+            / combo["initial_distance"] * 100
+            if combo["initial_distance"]
+            else 0.0
+        )
+
+        lines += [
+            f"## {combo['label']}",
+            "",
+            f"- **Initial (Constructive)**: {combo['initial_distance']:.2f}",
+            f"- **Final (Hybrid)**: {combo['final_distance']:.2f}",
+            f"- **Improvement**: {gain:.2f}%",
+            f"- **Total Execution Time**: {combo['execution_time'] * 1000:.3f} ms",
+            "",
+            "### Tahap 1 — Initialization",
+            "",
+            result_to_markdown(df, dist_matrix, s1, 4, include_detail),
+            "### Tahap 2 — Optimization",
+            "",
+            result_to_markdown(df, dist_matrix, s2, 4, include_detail),
+        ]
+
+    if len(results) >= 2:
+
+        baselines = {}
+
+        for r in results:
+
+            s1 = r["stage1"]
+
+            baselines.setdefault(s1["method"], {
+                "method": f"{s1['method']} (tanpa optimasi)",
+                "initial_distance": None,
+                "final_distance": s1["final_distance"],
+                "execution_time": s1["execution_time"]
+            })
+
+        entries = list(results) + list(baselines.values())
+
+        comparison_df = sort_by_distance(create_comparison_table(entries))
+
+        lines += ["## Comparison", "", df_to_markdown(comparison_df), ""]
+
+    return "\n".join(lines)
+
+
+def tabu_task_report(output, include_detail=False):
+
+    task_df = output["df"]
+    task_dist = output["dist"]
+    result = output["result"]
+
+    labels = task_df["node"].tolist()
+
+    lines = report_header(
+        "Laporan Tabu Search — Data Tugas",
+        "Data tugas" + (" (DUMMY)" if output.get("dummy") else ""),
+        len(task_df),
+        str(TABU_TASK_DATA.get("metric", "euclidean")).title()
+    )
+
+    matrix = (
+        pd.DataFrame(task_dist, index=labels, columns=labels)
+        .round(2)
+        .reset_index()
+        .rename(columns={"index": "Node"})
+    )
+
+    lines += [
+        "## Data",
+        "",
+        "**Node & koordinat**",
+        "",
+        df_to_markdown(task_df),
+        "",
+        "**Distance matrix**",
+        "",
+        df_to_markdown(matrix),
+        "",
+        result_to_markdown(task_df, task_dist, result, 2, include_detail),
+    ]
+
+    return "\n".join(lines)
+
+
+def render_report_export(title, build, filename, key):
+    """Expander berisi teks laporan + tombol salin (di kotak kode) + unduh."""
+
+    with st.expander(title, expanded=False):
+
+        st.caption(
+            "Semua hasil digabung jadi satu teks Markdown. Klik ikon salin "
+            "di pojok kanan atas kotak, atau unduh sebagai file."
+        )
+
+        include_detail = st.checkbox(
+            "Sertakan detail perhitungan tiap iterasi (teks jadi sangat panjang)",
+            value=False,
+            key=f"{key}_detail"
+        )
+
+        text = build(include_detail)
+
+        st.download_button(
+            "Unduh .md",
+            data=text,
+            file_name=filename,
+            mime="text/markdown",
+            key=f"{key}_download"
+        )
+
+        try:
+            st.code(text, language="markdown", height=420)
+        except TypeError:
+            st.code(text, language="markdown")
+
+# ============================================================
 # RUN ALGORITHM
 # ============================================================
 
@@ -4501,6 +4817,15 @@ def render_tabu_task():
         run_id=st.session_state.tabu_task_run_id
     )
 
+    st.divider()
+
+    render_report_export(
+        "📋 Salin hasil (untuk laporan)",
+        lambda detail: tabu_task_report(output, detail),
+        "laporan_tabu_tugas.md",
+        "report_tabutask"
+    )
+
 
 # ============================================================
 # HYBRID
@@ -4967,6 +5292,15 @@ def render_hybrid(df, dist_matrix, ctx):
             key=f"hybrid_{run_id}_cmp_improvement"
         )
 
+    st.divider()
+
+    render_report_export(
+        "📋 Salin Hasil Eksperimen",
+        lambda detail: hybrid_report(df, dist_matrix, results, detail),
+        "laporan_hybrid.md",
+        "report_hybrid"
+    )
+
 
 # ============================================================
 # HEADER
@@ -5342,7 +5676,8 @@ with tab_eksperimen:
     distance_method = st.radio(
         "Distance Method",
         ["Euclidean", "Manhattan"],
-        horizontal=True
+        horizontal=True,
+        key="distance_method"
     )
 
 
@@ -5787,6 +6122,17 @@ with tab_eksperimen:
                     use_container_width=True,
                     key="independent_cmp_improvement"
                 )
+
+            st.divider()
+
+            render_report_export(
+                "📋 Salin Hasil Eksperimen",
+                lambda detail: independent_report(
+                    df, dist_matrix, results, detail
+                ),
+                "laporan_independent.md",
+                "report_independent"
+            )
 
 
     # ============================================================
