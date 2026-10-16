@@ -1,4 +1,4 @@
-# Learning & Optimization — TSP Heuristic Playground
+# TSP Learning & Optimization Application
 
 Aplikasi web interaktif (Streamlit) untuk **membedah, menguji, dan membandingkan metode heuristik** pada *Travelling Salesman Problem* (TSP). Setiap algoritma menampilkan riwayat iterasi, detail perhitungan tiap langkah, visualisasi rute, serta perbandingan jarak dan waktu eksekusi.
 
