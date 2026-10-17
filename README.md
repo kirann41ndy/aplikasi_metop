@@ -10,8 +10,8 @@ Aplikasi web interaktif (Streamlit) untuk **membedah, menguji, dan membandingkan
 | Keperluan | Tautan |
 |---|---|
 | **Aplikasi web (live)** | https://aplikasimetop-7gpe34hcauak4qgfaosrot.streamlit.app/ |
-| Repositori utama (kelompok) | `[https://github.com/kirann41ndy/aplikasi_metop]` |
-| Repositori deploy (fork) | `https://github.com/elenafaradisa/aplikasi_metop/tree/main` |
+| Repositori utama (kelompok) | https://github.com/kirann41ndy/aplikasi_metop |
+| Repositori deploy (fork) | https://github.com/elenafaradisa/aplikasi_metop/tree/main |
 
 ## Catatan Repositori dan Deployment
 
