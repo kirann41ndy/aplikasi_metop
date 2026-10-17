@@ -6,7 +6,9 @@ Deskripsi singkat: Tabu Search untuk TSP. Neighborhood = semua kandidat 2-opt
                    (O(1) per kandidat lewat rumus delta), dipilih yang terbaik
                    di antara yang admissible: tidak tabu, atau tabu tetapi
                    memenuhi aspiration criterion (lebih baik dari solusi
-                   terbaik sejauh ini).
+                   terbaik sejauh ini). Jika semua kandidat tabu dan tak ada
+                   yang lolos aspiration, dipakai aspiration by default:
+                   bebaskan move "least tabu".
 """
 
 from .base import tour_distance, validate_tour
@@ -18,12 +20,16 @@ def get_neighbors(route, d, current_distance):
     Semua kandidat 2-opt dari rute tertutup [home, ..., home].
     Jarak tiap kandidat dihitung dari delta (O(1)), rute baru TIDAK dibangun
     di sini; cukup dibangun sekali untuk kandidat yang terpilih.
+
+    Untuk n kota ada C(n-1, 2) kandidat, mis. 6 kota -> 9 kandidat.
     """
     neighbors = []
     n = len(route) - 1
     for i in range(1, n - 1):
         a, b = route[i - 1], route[i]
         for j in range(i + 1, n):
+            if i == 1 and j == n - 1:
+                continue
             c, e = route[j], route[j + 1]
             delta = d[a][c] + d[b][e] - d[a][b] - d[c][e]
             neighbors.append({
@@ -37,9 +43,9 @@ def get_neighbors(route, d, current_distance):
 
 def removed_edges(route, i, j):
     """
-    Edge yang DIBUANG move (i, j), dihitung dari rute SAAT INI. Dipakai untuk
-    CEK terhadap tabu_list: kalau sama dengan edge yang baru ditambahkan move
-    sebelumnya, berarti kandidat ini membongkar balik (undo).
+    Edge yang dibuang move (i, j), dihitung dari rute saat ini. Dipakai untuk
+    cek terhadap tabu: move tabu kalau salah satu edge ini masih tabu
+    (admissible hanya jika kedua edge yang dibuang non-tabu).
     """
     e1 = frozenset((route[i - 1], route[i]))
     e2 = frozenset((route[j], route[j + 1]))
@@ -48,12 +54,36 @@ def removed_edges(route, i, j):
 
 def added_edges(route, i, j):
     """
-    Edge yang TERBENTUK oleh move (i, j), dihitung dari rute SAAT INI. Inilah
-    yang DISIMPAN ke tabu_list, karena undo = membongkar persis edge ini.
+    Edge yang terbentuk oleh move (i, j), dihitung dari rute saat ini. Kedua
+    edge ini yang dijadikan tabu (dilarang dibuang lagi) selama tabu_tenure.
     """
     e1 = frozenset((route[i - 1], route[j]))
     e2 = frozenset((route[i], route[j + 1]))
     return frozenset((e1, e2))
+
+
+def tabu_edge_expiry(tabu_list):
+    """
+    Ratakan tabu_list {pasangan edge baru: expiry} menjadi {edge: expiry}.
+    Kalau satu edge muncul di beberapa entri, dipakai expiry yang terbesar.
+    """
+    edge_expiry = {}
+    for pair, expiry in tabu_list.items():
+        for edge in pair:
+            if expiry > edge_expiry.get(edge, -1):
+                edge_expiry[edge] = expiry
+    return edge_expiry
+
+
+def tabu_remaining(removed, edge_expiry, iteration):
+    """
+    Total sisa tenure dari edge yang dibuang move pada iterasi ini.
+    0 = tidak ada edge tabu (move boleh); >0 = move tabu. Dipakai juga untuk
+    memilih move "least tabu" saat semua kandidat tabu.
+    """
+    return sum(
+        max(0, edge_expiry.get(edge, -1) - iteration + 1) for edge in removed
+    )
 
 
 def _validate(initial_route, dist_matrix, max_iter, tabu_tenure):
@@ -91,9 +121,13 @@ def tabu_search(
              lebih buruk dari sebelumnya), lalu update tabu_list.
     Step 6 : ulangi sampai max_iter. Rute terbaik = hasil akhir.
 
-    Larangan tabu dipasang pada EDGE BARU yang terbentuk tiap move dan berlaku
-    sampai iterasi (t + tabu_tenure), sehingga move yang membongkar edge itu
-    ditolak kecuali aspiration criterion terpenuhi.
+    Larangan tabu dipasang pada edge baru yang terbentuk tiap move dan berlaku
+    sampai iterasi (t + tabu_tenure). Sebuah move tabu jika salah satu edge
+    yang dibuangnya masih tabu; move tabu ditolak kecuali aspiration criterion
+    terpenuhi (jarak < solusi terbaik sejauh ini). Jika semua kandidat tabu dan
+    tak ada yang lolos aspiration, dipakai aspiration by default: pilih move
+    "least tabu" (total sisa tenure edge-dibuang terkecil), seri -> jarak
+    terkecil.
 
     Parameters
     ----------
@@ -108,7 +142,8 @@ def tabu_search(
     verbose_history : bool
         False -> history[k]["candidates"] = [] (ringan).
         True  -> diisi SEMUA kandidat tiap iterasi beserta status tabu,
-        aspiration, admissible, dan penanda "selected" (untuk tab Ilustrasi).
+        sisa tenure, aspiration, admissible, dan penanda "selected"
+        (untuk tab Ilustrasi).
 
     Returns
     -------
@@ -137,7 +172,7 @@ def tabu_search(
     # float tidak salah karena selisih ~1e-15.
     eps = EPS_REL * current_distance / max(len(current_route) - 1, 1)
 
-    tabu_list = {}   # added_edges -> iterasi kadaluarsa
+    tabu_list = {}   # pasangan edge baru (frozenset) -> iterasi kadaluarsa
 
     history = [{
         "iteration": 0,
@@ -158,6 +193,8 @@ def tabu_search(
         if not neighbors:
             break   # rute terlalu pendek (< 4 kota): tidak ada move 2-opt
 
+        edge_expiry = tabu_edge_expiry(tabu_list)
+
         candidate_log = []
         best_candidate = None
         best_idx = None
@@ -166,8 +203,11 @@ def tabu_search(
         for idx, nb in enumerate(neighbors):
             i, j = nb["i"], nb["j"]
 
-            check_attr = removed_edges(current_route, i, j)
-            is_tabu = tabu_list.get(check_attr, -1) >= iteration
+            # tabu jika salah satu edge yang dibuang masih tabu
+            removed = removed_edges(current_route, i, j)
+            remaining = tabu_remaining(removed, edge_expiry, iteration)
+            nb["tabu_remaining"] = remaining
+            is_tabu = remaining > 0
             aspiration_met = nb["distance"] < best_distance - eps
             admissible = (not is_tabu) or aspiration_met
 
@@ -178,7 +218,10 @@ def tabu_search(
                     "delta": nb["delta"],
                     "distance": nb["distance"],
                     "is_tabu": is_tabu,
+                    "tabu_remaining": remaining,
                     "aspiration_met": aspiration_met,
+                    # aspiration hanya bermakna kalau move tabu
+                    "aspiration_relevant": is_tabu,
                     "admissible": admissible,
                     "selected": False,
                 })
@@ -188,10 +231,20 @@ def tabu_search(
                 best_candidate = nb
                 best_idx = idx
 
-        # fallback langka: semua kandidat tabu dan tak ada yang aspiration_met
+        # aspiration by default: semua kandidat tabu dan tak ada yang
+        # aspiration_met -> bebaskan move "least tabu" (sisa tenure terkecil),
+        # kalau seri ambil jarak terkecil.
+        by_default = False
         if best_candidate is None:
-            best_idx = min(range(len(neighbors)), key=lambda k: neighbors[k]["distance"])
+            by_default = True
+            best_idx = min(
+                range(len(neighbors)),
+                key=lambda k: (neighbors[k]["tabu_remaining"],
+                               neighbors[k]["distance"]),
+            )
             best_candidate = neighbors[best_idx]
+            if verbose_history:
+                candidate_log[best_idx]["admissible"] = True
 
         if verbose_history:
             candidate_log[best_idx]["selected"] = True
@@ -204,6 +257,7 @@ def tabu_search(
         detail = describe_2opt_move(current_route, d, move)
         detail["i"], detail["j"] = i, j
         detail["distance_before"] = current_distance
+        detail["aspiration_by_default"] = by_default
 
         current_route = apply_2opt(current_route, move)
         # hitung ulang dari rute (bukan akumulasi delta) supaya tidak drift
