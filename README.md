@@ -1,8 +1,50 @@
 # TSP Learning & Optimization Application
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://aplikasimetop-7gpe34hcauak4qgfaosrot.streamlit.app/)
 
 Aplikasi web interaktif (Streamlit) untuk **membedah, menguji, dan membandingkan metode heuristik** pada *Travelling Salesman Problem* (TSP). Setiap algoritma menampilkan riwayat iterasi, detail perhitungan tiap langkah, visualisasi rute, serta perbandingan jarak dan waktu eksekusi.
 
 > Tugas Kuliah — Metode Optimasi (METOP) · Departemen Sains Data, Institut Teknologi Sepuluh Nopember (ITS)
+
+## Tautan
+
+| Keperluan | Tautan |
+|---|---|
+| **Aplikasi web (live)** | https://aplikasimetop-7gpe34hcauak4qgfaosrot.streamlit.app/ |
+| Repositori utama (kelompok) | `[https://github.com/kirann41ndy/aplikasi_metop]` |
+| Repositori deploy (fork) | `https://github.com/elenafaradisa/aplikasi_metop/tree/main` |
+
+## Catatan Repositori dan Deployment
+
+Repositori ini adalah **fork** dari repositori utama kelompok. Aplikasi web **dijalankan (di-deploy) dari fork ini**, bukan dari repositori utama.
+
+Alasannya: Streamlit Community Cloud hanya dapat men-deploy repositori yang dapat diakses oleh akun GitHub yang dipakai untuk login Streamlit. Karena itu repositori utama di-fork ke akun pribadi, lalu fork tersebut yang dihubungkan ke Streamlit Community Cloud.
+
+Konsekuensinya:
+
+- Perubahan kode baru tampil di web setelah di-*push* ke **fork** (Streamlit akan men-deploy ulang otomatis).
+- Perubahan yang hanya masuk ke repositori utama **belum** tampil di web sampai fork disinkronkan.
+
+Cara menyinkronkan fork dengan repositori utama:
+
+```bash
+# sekali saja: daftarkan repositori utama sebagai "upstream"
+git remote add upstream <URL-repositori-utama>
+
+# setiap kali ingin menarik perubahan terbaru
+git fetch upstream
+git checkout main
+git merge upstream/main
+git push origin main        # push ke fork -> web ter-deploy ulang
+```
+
+Cara men-deploy dari fork ke Streamlit Community Cloud:
+
+1. Buka https://share.streamlit.io lalu login dengan akun GitHub pemilik fork.
+2. Klik **Create app**, pilih repositori **fork**, branch `main`, dan *main file path* `app.py`.
+3. (Opsional) pada **Advanced settings**, pilih Python 3.12.
+4. Klik **Deploy**. Dependensi dibaca dari `requirements.txt`.
+
+> Aplikasi gratis di Streamlit Community Cloud dapat "tertidur" bila lama tidak dibuka. Klik tombol *Wake up* bila muncul.
 
 ### Anggota Kelompok
 
@@ -18,14 +60,14 @@ Aplikasi web interaktif (Streamlit) untuk **membedah, menguji, dan membandingkan
 
 ## Fitur Utama
 
-- **9 algoritma** dari tiga keluarga: Constructive, Local Search, dan Metaheuristic.
+- **8 algoritma** dari tiga keluarga: Constructive, Local Search, dan Metaheuristic.
+- **Empat sumber data**: dataset bawaan `small.csv` (dimuat otomatis saat aplikasi dibuka), generate acak, upload CSV/Excel, dan input manual.
 - **Dua mode eksekusi**
   - **Independent** — pilih satu atau beberapa algoritma, masing-masing berjalan dengan initialization dan parameternya sendiri.
   - **Hybrid** — rute dari algoritma Constructive dipakai sebagai *initial route* algoritma Optimization.
 - **Detail per iterasi** — rute sebelum dan sesudah, edge yang dibuang dan ditambah, rumus delta, serta tabel kandidat move yang dievaluasi (2-opt dan 3-opt).
 - **Visualisasi** — sebaran node dan rute dengan arah panah (Plotly), bisa dilihat per iterasi.
 - **Perbandingan hasil** — tabel jarak awal/akhir, persentase improvement, waktu eksekusi, plus grafik perbandingan.
-- **Tab Tabu Search (Tugas)** — halaman khusus untuk data soal tugas (6 kota), terpisah dari dataset dan sidebar mode Eksperimen.
 - **Distance matrix** — Euclidean atau Manhattan.
 
 ## Algoritma yang Tersedia
@@ -46,7 +88,14 @@ Catatan implementasi:
 - Rute selalu berbentuk **tur tertutup** `[home, ..., home]` dengan panjang `n + 1`, dan node *home* tidak pernah dipindahkan.
 - **2-opt**: membalik segmen `route[i..j]` dengan `1 ≤ i < j ≤ n-1`. **3-opt**: 7 variant penyambungan ulang, 3 di antaranya setara 2-opt.
 - **Strategy** `best` memilih move dengan delta paling kecil, `first` memilih move pertama yang memperbaiki rute. Pencarian berhenti di local optimum atau saat `max_iter` tercapai.
-- **Tabu Search** memakai neighborhood 2-opt, larangan tabu dipasang pada edge baru yang terbentuk, dan ada kriteria aspirasi.
+- **Simulated Annealing** memilih satu move 2-opt acak per iterasi. Move yang lebih buruk diterima dengan peluang `exp(-Δ/T)`. Suhu dikalikan `cooling_rate` tiap iterasi, dan rute terbaik selama pencarian yang dikembalikan.
+- **Tabu Search** memakai neighborhood 2-opt:
+  - Move yang hanya membalik seluruh rute di antara node home (rute sama, dibaca terbalik, delta 0) tidak dijadikan kandidat, sehingga untuk `n` node ada `C(n-1, 2) - 1` kandidat per iterasi.
+  - Dua edge baru yang terbentuk dari move terpilih dilarang dibongkar selama `tabu_tenure` iterasi.
+  - Sebuah move berstatus tabu bila **salah satu** edge yang dibuangnya masih tabu.
+  - Move tabu tetap boleh dipilih bila jaraknya lebih pendek dari solusi terbaik sejauh ini (*aspiration criterion*).
+  - Bila semua kandidat tabu dan tidak ada yang memenuhi aspirasi, dipilih move *least tabu* (total sisa tenure terkecil, bila seri dipilih jarak terkecil).
+  - Intensification dan diversification tidak diimplementasikan.
 
 ## Struktur Proyek
 
@@ -104,12 +153,6 @@ Aplikasi terbuka di `http://localhost:8501`. Gunakan Streamlit versi terbaru (di
 4. Buka hasil: jarak awal/akhir, waktu eksekusi, rute, grafik, **Tabel Iterasi**, dan **Detail Iterasi** lewat pilihan *Pilih Iterasi*.
 5. Bila lebih dari satu algoritma dijalankan, bagian **Comparison** menampilkan perbandingan jarak, waktu, dan improvement.
 
-### Tab "Tabu Search (Tugas)"
-
-Berisi data soal tugas (6 kota, jarak Euclidean). Atur *Tabu Tenure* dan *Max Iteration*, pilih rute awal (**Dari soal** / Generate Random / Manual), lalu klik **Run Tabu Search (Tugas)**. Data soal disimpan di variabel `TABU_TASK_DATA` pada `app.py`.
-
-Rute awal dari soal: `3 → 2 → 4 → 1 → 5 → 6 → 3` (jarak 2963.8852).
-
 ## Format Dataset
 
 File CSV/Excel berisi koordinat dengan minimal **3 node**, tanpa *missing value*.
@@ -124,6 +167,15 @@ x,y
 - Kolom wajib `x` dan `y`. Kolom `node` opsional dan dibuat otomatis (0, 1, 2, ...) bila tidak ada.
 - CSV **tanpa header** dengan tepat 2 kolom juga diterima (seperti `dataset/small.csv`).
 - Nama node tidak boleh duplikat.
+
+## Batasan Aplikasi
+
+- **3-opt** dibatasi sampai **150 node** karena kompleksitasnya O(n³) per iterasi.
+- Detail kandidat Tabu Search (`verbose_history`) hanya diaktifkan otomatis sampai **100 node**.
+- Tabel kandidat 3-opt tidak ditampilkan bila rute lebih dari **60 node**, dan distance matrix hanya ditampilkan sampai **100 node**.
+- Pada mode Hybrid, maksimal **12 kombinasi** per proses.
+- Delta 2-opt/3-opt mengasumsikan distance matrix **simetris** (otomatis terpenuhi bila dibuat dari koordinat).
+- Setiap algoritma dijalankan satu kali per proses. Algoritma yang melibatkan proses acak (Arbitrary Insertion, rute awal acak, Simulated Annealing) bergantung pada `seed`.
 
 ## Contoh Memakai Algoritma Langsung (tanpa UI)
 
