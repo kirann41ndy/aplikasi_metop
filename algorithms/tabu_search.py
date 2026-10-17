@@ -1,15 +1,3 @@
-"""
-Nama Algoritma: Tabu Search
-Author: Indy
-Deskripsi singkat: Tabu Search untuk TSP. Neighborhood = semua kandidat 2-opt
-                   (reverse segmen rute). Tiap iterasi SEMUA kandidat dievaluasi
-                   (O(1) per kandidat lewat rumus delta), dipilih yang terbaik
-                   di antara yang admissible: tidak tabu, atau tabu tetapi
-                   memenuhi aspiration criterion (lebih baik dari solusi
-                   terbaik sejauh ini). Jika semua kandidat tabu dan tak ada
-                   yang lolos aspiration, dipakai aspiration by default:
-                   bebaskan move "least tabu".
-"""
 
 from .base import tour_distance, validate_tour
 from .local_search import apply_2opt, describe_2opt_move, EPS_REL
