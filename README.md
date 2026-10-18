@@ -15,7 +15,7 @@ Aplikasi web interaktif (Streamlit) untuk **membedah, menguji, dan membandingkan
 
 ## Catatan Repositori dan Deployment
 
-Repositori ini adalah **fork** dari repositori utama kelompok. Aplikasi web **dijalankan (di-deploy) dari fork ini**, bukan dari repositori utama.
+Repositori ini adalah repositori utama kelompok. Aplikasi web **tidak** di-deploy langsung dari repositori ini, melainkan dari fork-nya yang berada di akun GitHub pribadi salah satu anggota.
 
 Alasannya: Streamlit Community Cloud hanya dapat men-deploy repositori yang dapat diakses oleh akun GitHub yang dipakai untuk login Streamlit. Karena itu repositori utama di-fork ke akun pribadi, lalu fork tersebut yang dihubungkan ke Streamlit Community Cloud.
 
