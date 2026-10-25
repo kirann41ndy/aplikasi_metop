@@ -296,7 +296,7 @@ def tabu_remaining(tokens, tabu_list, iteration):
     )
 
 
-def _validate(initial_route, dist_matrix, max_iter, tabu_tenure, move_type):
+def _validate(initial_route, dist_matrix, max_iter, tabu_tenure, move_type, stop_criterion, patience):
     n = len(dist_matrix)
     if any(len(row) != n for row in dist_matrix):
         raise ValueError("dist_matrix harus berbentuk persegi (n x n).")
@@ -341,7 +341,7 @@ def tabu_search(
              3-opt / swap), hitung total distance tiap kandidat.
     Step 5 : pilih kandidat admissible terbaik jadi current solution (boleh
              lebih buruk dari sebelumnya), lalu update tabu_list.
-    Step 6 : ulangi sampai max_iter. Rute terbaik = hasil akhir.
+    Step 6 : ulangi sampai max_iter atau konvergen. Rute terbaik = hasil akhir.
 
     Larangan tabu dipasang pada edge baru yang terbentuk tiap move dan berlaku
     sampai iterasi (t + tabu_tenure), berlaku sama untuk ketiga move_type.
@@ -358,20 +358,32 @@ def tabu_search(
     dist_matrix : list
         Matriks jarak (diasumsikan simetris).
     max_iter : int
-        Maksimum iterasi.
+        Maksimum iterasi. Pada stop_criterion="max_iter" ini adalah satu-
+        satunya kriteria henti; pada "convergence" ini jadi batas pengaman
+        supaya loop tidak berjalan tanpa akhir.
     tabu_tenure : int
         Lama (iterasi) sebuah edge baru dilarang dibongkar.
     move_type : str
         Mekanisme pergerakan/neighborhood: "2opt" (default), "3opt", atau
         "swap". Neighborhood 3-opt jauh lebih besar (O(n^3) vs O(n^2) untuk
-        2-opt/swap), jadi tiap iterasi lebih lambat -- pertimbangkan
+        2-opt/swap), jadi tiap iterasi lebih lambat, pertimbangkan
         max_iter lebih kecil kalau n besar.
     verbose_history : bool
         False -> history[k]["candidates"] = [] (ringan).
         True  -> diisi SEMUA kandidat tiap iterasi beserta status tabu,
         sisa tenure, aspiration, admissible, dan penanda "selected"
         (untuk tab Ilustrasi).
-
+    patience : int
+        Jumlah iterasi berturut-turut tanpa perbaikan best_distance yang
+        ditoleransi sebelum dianggap konvergen. Hanya dipakai jika
+        stop_criterion="convergence". Harus integer >= 1; sebaiknya tidak
+        lebih kecil dari tabu_tenure agar tabu list sempat "lepas".
+    stop_criterion : str
+        Kriteria perhentian: "max_iter" (default) berhenti setelah max_iter
+        iterasi; "convergence" berhenti lebih awal jika best_distance tidak
+        membaik selama `patience` iterasi berturut-turut. Yang dipantau
+        adalah solusi terbaik, bukan rute yang sedang dijalani (rute
+        sekarang di Tabu Search hampir selalu berpindah).
     Returns
     -------
     dict
@@ -389,7 +401,7 @@ def tabu_search(
     # =========================
 
     d = dist_matrix
-    current_route = _validate(initial_route, d, max_iter, tabu_tenure, move_type)
+    current_route = _validate(initial_route, d, max_iter, tabu_tenure, move_type, stop_criterion, patience)
     current_distance = tour_distance(current_route, d)
 
     move_spec = MOVE_TYPES[move_type]
@@ -505,7 +517,7 @@ def tabu_search(
         else:
             no_improve += 1
 
-         history.append({
+        history.append({
             "iteration": iteration,
             "route": current_route.copy(),
             "distance": current_distance,
