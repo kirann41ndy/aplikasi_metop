@@ -1115,12 +1115,12 @@ ALGORITHMS = {
             "Mencari solusi dengan menerima beberapa solusi yang lebih buruk secara probabilistik.",
         "parameters": {
             "initial_temp": {
-                "type": "float", "default": 5.0, "default_hybrid": 1.0, "min": 0.01,
+                "type": "float", "default": 10.0, "default_hybrid": 0.5, "min": 0.01,
                 "max": 100000.0, "step": 0.5, "format": "%.2f",
-                "help": "Suhu awal. Terlalu tinggi = rute awal yang bagus dirusak (Hybrid); terlalu rendah = SA tidak sempat keluar dari rute acak (Independent). Default Independent 5, Hybrid 1 (untuk skala data kecil; skala 0-100 naikkan sekitar 10x)."
+                "help": "Suhu awal. Terlalu tinggi = rute awal yang bagus dirusak (Hybrid); terlalu rendah = SA tidak sempat keluar dari rute acak (Independent). Default Independent 10, Hybrid 0.5 (untuk skala data kecil seperti small.csv; skala 0-100 naikkan sekitar 10x)."
             },
             "cooling_rate": {
-                "type": "float", "default": 0.998, "default_hybrid": 0.995, "min": 0.01,
+                "type": "float", "default": 0.998, "default_hybrid": 0.998, "min": 0.01,
                 "max": 0.999, "step": 0.001, "format": "%.3f",
                 "help": "Faktor pengali suhu. Makin dekat 1, pendinginan makin lambat."
             },
@@ -1139,7 +1139,7 @@ ALGORITHMS = {
                 "help": "Jumlah langkah pada setiap level suhu."
             },
             "max_iter": {
-                "type": "int", "default": 5000, "default_hybrid": 1000, "min": 1, "max": 10000, "step": 1,
+                "type": "int", "default": 5000, "default_hybrid": 3000, "min": 1, "max": 10000, "step": 1,
                 "help": "Batas maksimum langkah."
             },
             "stop_criterion": {
@@ -3729,22 +3729,7 @@ def hybrid_report(df, dist_matrix, results, include_detail=False):
 
     if len(results) >= 2:
 
-        baselines = {}
-
-        for r in results:
-
-            s1 = r["stage1"]
-
-            baselines.setdefault(s1["method"], {
-                "method": f"{s1['method']} (tanpa optimasi)",
-                "initial_distance": None,
-                "final_distance": s1["final_distance"],
-                "execution_time": s1["execution_time"]
-            })
-
-        entries = list(results) + list(baselines.values())
-
-        comparison_df = sort_by_distance(create_comparison_table(entries))
+        comparison_df = sort_by_distance(create_comparison_table(results))
 
         lines += ["## Comparison", "", df_to_markdown(comparison_df), ""]
 
@@ -3867,7 +3852,7 @@ def run_algorithm(
         return simulated_annealing(
             dist_matrix,
             initial_route=initial_route,
-            initial_temp=parameters.get("initial_temp", 5.0),
+            initial_temp=parameters.get("initial_temp", 10.0),
             cooling_rate=parameters.get("cooling_rate", 0.998),
             min_temp=parameters.get("min_temp", 0.01),
             max_iter=int(parameters.get("max_iter", 1000)),
@@ -4910,33 +4895,16 @@ def render_hybrid(df, dist_matrix, ctx):
 
     if len(results) >= 2:
 
-        # Pembanding: hasil Constructive saja (tanpa optimasi)
-        baselines = {}
-
-        for r in results:
-
-            s1 = r["stage1"]
-
-            baselines.setdefault(s1["method"], {
-                "method": f"{s1['method']} (tanpa optimasi)",
-                "initial_distance": None,
-                "final_distance": s1["final_distance"],
-                "execution_time": s1["execution_time"]
-            })
-
-        entries = list(results) + list(baselines.values())
-
         st.divider()
 
         st.header("Comparison")
 
         st.caption(
-            "Hybrid dibandingkan satu sama lain dan dengan hasil "
-            "Constructive saja (tanpa optimasi)."
+            "Perbandingan antar kombinasi Hybrid."
         )
 
         comparison_df = sort_by_distance(
-            create_comparison_table(entries)
+            create_comparison_table(results)
         )
 
         st.dataframe(
