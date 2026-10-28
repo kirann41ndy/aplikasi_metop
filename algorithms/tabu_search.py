@@ -243,11 +243,6 @@ def describe_swap_move(route, d, move):
 def _move_tuple_swap(c):
     return (c["delta"], c["i"], c["j"])
 
-
-# ---------------------------------------------------------
-# Registry: satu tempat buat nambah mekanisme baru nanti
-# ---------------------------------------------------------
-
 MOVE_TYPES = {
     "2opt": {
         "label": "2-opt",
@@ -323,11 +318,11 @@ def tabu_search(
     dist_matrix,
 
     # parameter algoritma
-    max_iter=100,
-    tabu_tenure=3,
+    max_iter=1000,
+    tabu_tenure=5,
     move_type="2opt", 
-    stop_criterion ="max_iter",
-    patience = 20,
+    stop_criterion ="convergence",
+    patience = 30,
     verbose_history=False,
 ):
     """
