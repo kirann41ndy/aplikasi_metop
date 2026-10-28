@@ -28,8 +28,88 @@ from algorithms.simulated_annealing import (
 )
 
 from algorithms.tabu_search import (
-    tabu_search
+    tabu_search,
+    MOVE_TYPES as TABU_MOVES
 )
+
+
+# ------------------------------------------------------------
+# PERBAIKAN EDGE TABU (3opt & swap) -- dilakukan di app, file
+# algorithms/tabu_search.py tidak diubah.
+#
+# Pada 3-opt varian 0-2 dan swap dengan j == i+2, ada edge yang
+# "dibuang" sekaligus "ditambah" lagi (tidak benar-benar berubah).
+# Edge seperti itu harus dikeluarkan dari kedua set supaya tidak
+# salah dianggap tabu dan tidak masuk ke tabu list.
+# ------------------------------------------------------------
+
+def _tabu_edge_sets(spec_key, route, c):
+
+    if spec_key == "3opt":
+
+        i, j, k, v = c["i"], c["j"], c["k"], c["variant"]
+        a, b1 = route[i - 1], route[i]
+        b2, c1 = route[j - 1], route[j]
+        c2, e = route[k - 1], route[k]
+
+        removed = {
+            frozenset((a, b1)),
+            frozenset((b2, c1)),
+            frozenset((c2, e)),
+        }
+
+        added_pairs = (
+            [(a, b2), (b1, c1), (c2, e)],
+            [(a, b1), (b2, c2), (c1, e)],
+            [(a, c2), (c1, b2), (b1, e)],
+            [(a, b2), (b1, c2), (c1, e)],
+            [(a, c1), (c2, b1), (b2, e)],
+            [(a, c1), (c2, b2), (b1, e)],
+            [(a, c2), (c1, b1), (b2, e)],
+        )[v]
+
+        added = {frozenset(p) for p in added_pairs}
+
+    else:  # swap
+
+        i, j = c["i"], c["j"]
+        r = route
+
+        if j == i + 1:
+            removed = {
+                frozenset((r[i - 1], r[i])),
+                frozenset((r[j], r[j + 1])),
+            }
+            added = {
+                frozenset((r[i - 1], r[j])),
+                frozenset((r[i], r[j + 1])),
+            }
+        else:
+            removed = {
+                frozenset((r[i - 1], r[i])), frozenset((r[i], r[i + 1])),
+                frozenset((r[j - 1], r[j])), frozenset((r[j], r[j + 1])),
+            }
+            added = {
+                frozenset((r[i - 1], r[j])), frozenset((r[j], r[i + 1])),
+                frozenset((r[j - 1], r[i])), frozenset((r[i], r[j + 1])),
+            }
+
+    return removed, added
+
+
+for _key in ("3opt", "swap"):
+
+    TABU_MOVES[_key]["broken_edges"] = (
+        lambda route, c, _k=_key: (
+            lambda rs: rs[0] - rs[1]
+        )(_tabu_edge_sets(_k, route, c))
+    )
+
+    TABU_MOVES[_key]["formed_edges"] = (
+        lambda route, c, _k=_key: (
+            lambda rs: rs[1] - rs[0]
+        )(_tabu_edge_sets(_k, route, c))
+    )
 
 # Pembacaan data + logo + dataset bawaan digabung di utils/load_data.py
 from utils.load_data import (
@@ -125,7 +205,7 @@ def sidebar_section(title, icon, expanded=True):
 
     try:
         return st.expander(title, expanded=expanded, icon=icon)
-    except TypeError:               
+    except TypeError:
         return st.expander(title, expanded=expanded)
 
 
@@ -185,17 +265,26 @@ st.markdown(
     /* Hierarki ukuran + jarak: Results (h2) > nama algoritma (h3) */
     [data-testid="stMain"] h2 {
         font-size: 2.1rem !important;
-        margin-top: 0.5rem !important;
-        margin-bottom: 1.2rem !important;
+        padding: 0 !important;
+        margin: 0 0 0.2rem 0 !important;
     }
     [data-testid="stMain"] h3 {
         font-size: 1.4rem !important;
-        margin-top: 1.6rem !important;
-        margin-bottom: 0.8rem !important;
+        padding: 0 !important;
+        margin: 0 0 0.2rem 0 !important;
+    }
+    [data-testid="stMain"] h4 {
+        padding: 0 !important;
+        margin: 0 !important;
     }
 
-    /* Garis pemisah lembut */
-    hr { border-color: rgba(107, 11, 12, 0.18) !important; }
+    /* Garis pemisah lembut + jarak antar bagian */
+    hr {
+        border-color: rgba(107, 11, 12, 0.18) !important;
+    }
+    [data-testid="stMain"] hr {
+        margin: 1rem 0 !important;
+    }
 
     /* ======================================================
        SIDEBAR  (gaya baru: maroon gradasi, kartu, ikon)
@@ -325,7 +414,7 @@ st.markdown(
         fill: #E2EDF0 !important;
         color: #E2EDF0 !important;
     }
-    
+
     [data-testid="stSidebar"] [data-testid="stTooltipIcon"] svg path,
     [data-testid="stSidebar"] label svg path {
         fill: #E2EDF0 !important;
@@ -968,7 +1057,7 @@ ALGORITHMS = {
         "parameters": {
             "max_iter": {
                 "type": "int",
-                "default": 100,
+                "default": 1000,
                 "min": 1,
                 "max": 10000,
                 "step": 1,
@@ -995,7 +1084,7 @@ ALGORITHMS = {
         "parameters": {
             "max_iter": {
                 "type": "int",
-                "default": 100,
+                "default": 1000,
                 "min": 1,
                 "max": 10000,
                 "step": 1,
@@ -1026,55 +1115,46 @@ ALGORITHMS = {
             "Mencari solusi dengan menerima beberapa solusi yang lebih buruk secara probabilistik.",
         "parameters": {
             "initial_temp": {
-                "type": "float",
-                "default": 1000.0,
-                "min": 0.01,
-                "max": 100000.0,
-                "step": 10.0,
-                "help":
-                    "Suhu awal proses pencarian."
+                "type": "float", "default": 100.0, "min": 0.01,
+                "max": 100000.0, "step": 10.0,
+                "help": "Suhu awal. Sebaiknya sebanding dengan rata-rata jarak antar node."
             },
             "cooling_rate": {
-                "type": "float",
-                "default": 0.95,
-                "min": 0.01,
-                "max": 0.999,
-                "step": 0.01,
-                "help":
-                    "Seberapa cepat suhu diturunkan."
+                "type": "float", "default": 0.99, "min": 0.01,
+                "max": 0.999, "step": 0.001, "format": "%.3f",
+                "help": "Faktor pengali suhu. Makin dekat 1, pendinginan makin lambat."
             },
             "min_temp": {
-                "type": "float",
-                "default": 0.01,
-                "min": 0.0001,
-                "max": 100.0,
-                "step": 0.01,
-                "help":
-                    "Suhu minimum sebelum pencarian berhenti."
+                "type": "float", "default": 0.01, "min": 0.0001,
+                "max": 100.0, "step": 0.01,
+                "help": "Suhu minimum sebelum pencarian berhenti."
+            },
+            "move_operator": {
+                "type": "select", "options": ["2-opt", "swap", "insertion"],
+                "default": "2-opt",
+                "help": "Cara membuat kandidat tetangga secara acak."
+            },
+            "iter_per_temp": {
+                "type": "int", "default": 1, "min": 1, "max": 1000, "step": 1,
+                "help": "Jumlah langkah pada setiap level suhu."
             },
             "max_iter": {
-                "type": "int",
-                "default": 10,
-                "min": 1,
-                "max": 10000,
-                "step": 1,
-                "help":
-                    "Batas maksimum iterasi."
+                "type": "int", "default": 1000, "min": 1, "max": 10000, "step": 1,
+                "help": "Batas maksimum langkah."
+            },
+            "stop_criterion": {
+                "type": "select", "options": ["max_iter", "convergence"],
+                "default": "max_iter",
+                "help": "Convergence: berhenti jika jarak terbaik tidak membaik selama N langkah."
+            },
+            "patience": {
+                "type": "int", "default": 200, "min": 1, "max": 10000, "step": 1,
+                "show_if": ("stop_criterion", "convergence"),
+                "help": "Jumlah langkah tanpa perbaikan sebelum dianggap konvergen."
             },
             "seed": {
-                "type": "int",
-                "default": 42,
-                "min": 0,
-                "max": 99999,
-                "step": 1,
-                "help":
-                    "Seed untuk menjaga proses acak tetap konsisten."
-            },
-            "verbose_history": {
-                "type": "bool",
-                "default": False,
-                "help":
-                    "Menyimpan history proses pencarian."
+                "type": "int", "default": 42, "min": 0, "max": 99999, "step": 1,
+                "help": "Seed untuk menjaga proses acak tetap konsisten."
             }
         }
     },
@@ -1088,32 +1168,36 @@ ALGORITHMS = {
         "description":
             "Mencari solusi dengan menggunakan tabu list untuk menghindari perpindahan yang sama.",
         "parameters": {
+            "move_type": {
+                "type": "select", "options": ["2opt", "3opt", "swap"],
+                "default": "2opt",
+                "help": "Mekanisme neighborhood. 3opt jauh lebih berat (O(n^3) kandidat per iterasi)."
+            },
             "max_iter": {
-                "type": "int",
-                "default": 100,
-                "min": 1,
-                "max": 10000,
-                "step": 1,
-                "help":
-                    "Batas maksimum iterasi."
+                "type": "int", "default": 1000, "min": 1, "max": 10000, "step": 1,
+                "help": "Batas maksimum iterasi."
             },
             "tabu_tenure": {
-                "type": "int",
-                "default": 3,
-                "min": 1,
-                "max": 100,
-                "step": 1,
-                "help":
-                    "Lama perpindahan disimpan dalam tabu list."
+                "type": "int", "default": 5, "min": 1, "max": 100, "step": 1,
+                "help": "Lama edge baru dilarang dibongkar. Patokan: sekitar akar n."
+            },
+            "stop_criterion": {
+                "type": "select", "options": ["max_iter", "convergence"],
+                "default": "convergence",
+                "help": "Convergence: berhenti jika jarak terbaik tidak membaik selama N iterasi."
+            },
+            "patience": {
+                "type": "int", "default": 30, "min": 1, "max": 10000, "step": 1,
+                "show_if": ("stop_criterion", "convergence"),
+                "help": "Jumlah iterasi tanpa perbaikan. Sebaiknya minimal sebesar tabu tenure."
             },
             "verbose_history": {
-                "type": "bool",
-                "default": False,
-                "help":
-                    "Menyimpan history proses pencarian."
+                "type": "bool", "default": False,
+                "help": "Menyimpan history proses pencarian."
             }
         }
     }
+
 }
 
 
@@ -1397,13 +1481,91 @@ def two_opt_move(route, i, j):
 
 
 def attr_text(attr, labels):
-    """Atribut tabu (frozenset berisi edge) -> teks 'A–B, C–D'."""
+    """Satu edge tabu (frozenset {a, b}) -> teks 'A–B'."""
 
     try:
-        edges = sorted(tuple(sorted(edge)) for edge in attr)
-        return ", ".join(_edge(a, b, labels) for a, b in edges)
+        a, b = sorted(attr)
+        return _edge(a, b, labels)
     except Exception:
         return str(attr)
+
+
+def _pairs_of(edge_set):
+    """Set of frozenset edge -> list of (a, b) terurut."""
+
+    return [tuple(sorted(e)) for e in edge_set]
+
+
+def _net_edges(removed_pairs, added_pairs):
+    """Buang edge yang dibuang lalu ditambah lagi (tidak benar-benar berubah)."""
+
+    rs = {frozenset(e) for e in removed_pairs}
+    as_ = {frozenset(e) for e in added_pairs}
+
+    return (
+        [e for e in removed_pairs if frozenset(e) not in as_],
+        [e for e in added_pairs if frozenset(e) not in rs],
+    )
+
+
+def sa_move_effect(route, move, labels):
+    """(edge dibuang, edge ditambah, keterangan) untuk satu move SA."""
+
+    kind = move.get("type")
+    pos = move.get("positions") or {}
+    i, j = pos.get("i"), pos.get("j")
+
+    if i is None or j is None:
+        return None
+
+    r, L = route, labels
+
+    if kind == "2-opt":
+
+        removed = [(r[i - 1], r[i]), (r[j], r[j + 1])]
+        added = [(r[i - 1], r[j]), (r[i], r[j + 1])]
+        seg = r[i:j + 1]
+        note = (
+            f"Potongan {route_text(seg, L)} dibalik "
+            f"menjadi {route_text(seg[::-1], L)}"
+        )
+
+    elif kind == "swap":
+
+        if j == i + 1:
+            removed = [(r[i - 1], r[i]), (r[j], r[j + 1])]
+            added = [(r[i - 1], r[j]), (r[i], r[j + 1])]
+        else:
+            removed = [
+                (r[i - 1], r[i]), (r[i], r[i + 1]),
+                (r[j - 1], r[j]), (r[j], r[j + 1]),
+            ]
+            added = [
+                (r[i - 1], r[j]), (r[j], r[i + 1]),
+                (r[j - 1], r[i]), (r[i], r[j + 1]),
+            ]
+
+        note = (
+            f"Kota {L[r[i]]} (posisi {i}) dan {L[r[j]]} (posisi {j}) ditukar"
+        )
+
+    elif kind == "insertion":
+
+        node = r[i]
+        rest = r[:i] + r[i + 1:]
+        new = rest[:j] + [node] + rest[j:]
+
+        removed = [(r[i - 1], r[i]), (r[i], r[i + 1]), (new[j - 1], new[j + 1])]
+        added = [(r[i - 1], r[i + 1]), (new[j - 1], node), (node, new[j + 1])]
+
+        note = f"Kota {L[node]} dipindah dari posisi {i} ke posisi {j}"
+
+    else:
+        return None
+
+    removed, added = _net_edges(removed, added)
+
+    return removed, added, note
 
 
 def _get(item, move, *names):
@@ -1413,23 +1575,6 @@ def _get(item, move, *names):
         for source in (item, move):
             if isinstance(source, dict) and source.get(name) is not None:
                 return source[name]
-
-    return None
-
-
-def _move_ij(move):
-    """Posisi (i, j) dari berbagai bentuk 'move'."""
-
-    if not isinstance(move, dict):
-        return None
-
-    if "i" in move and "j" in move:
-        return int(move["i"]), int(move["j"])
-
-    positions = move.get("positions")
-
-    if isinstance(positions, dict) and "i" in positions and "j" in positions:
-        return int(positions["i"]), int(positions["j"])
 
     return None
 
@@ -2240,8 +2385,16 @@ def _local_view(history, k, dist, labels, strategy=None):
 
 
 # ============================================================
-# TABU SEARCH
+# TABU SEARCH (2-opt / 3-opt / swap)
 # ============================================================
+
+def _tabu_spec(move):
+    """Ambil spesifikasi move_type dari tipe move pada history."""
+
+    key = str(move.get("type", "")).lower().replace("-", "")
+
+    return TABU_MOVES.get(key)
+
 
 def _tabu_view(history, k, dist, labels):
 
@@ -2272,61 +2425,82 @@ def _tabu_view(history, k, dist, labels):
     best_after = min(h.get("distance") for h in history[:k + 1])
 
     move = item.get("move") or {}
-
-    ij = _move_ij(move)
-
     candidates = item.get("candidates") or []
+
+    spec = _tabu_spec(move)
+
+    removed_pairs, added_pairs = _net_edges(
+        [e["edge"] for e in move.get("removed_edges", [])],
+        [e["edge"] for e in move.get("added_edges", [])],
+    )
 
     pairs = [("Rute Sebelumnya", route_text(route_before, L))]
 
-    removed = added = None
-
-    if ij is not None:
-
-        mi, mj = ij
-
-        removed, added, _ = two_opt_move(route_before, mi, mj)
-
-        chosen = next(
-            (c for c in candidates if c["i"] == mi and c["j"] == mj),
-            None
-        )
-
-        if chosen is None:
-            reason = None
-        elif chosen.get("admissible") and chosen.get("is_tabu"):
-            reason = (
-                "Move ini tabu, tetapi jaraknya lebih baik dari jarak "
-                f"terbaik sebelumnya ({_f(best_before)}), sehingga tetap "
-                "boleh dipilih (aspirasi)"
-            )
-        elif chosen.get("admissible"):
-            reason = (
-                "Jarak terkecil di antara kandidat yang tidak tabu "
-                "(boleh lebih panjang dari rute sebelumnya)"
-            )
-        else:
-            reason = (
-                "Semua kandidat tabu dan tidak ada yang memenuhi aspirasi, "
-                "jadi dipilih kandidat dengan jarak terkecil"
-            )
+    if move.get("removed_edges"):
 
         pairs.append((
             "Move Dipilih",
-            f"Hapus sambungan {_edges(removed, L)}, "
-            f"lalu sambung ulang {_edges(added, L)}",
+            f"[{move.get('type')}] Hapus sambungan "
+            f"{_edges(removed_pairs, L)}, "
+            f"lalu sambung ulang {_edges(added_pairs, L)}",
         ))
 
-        segment = route_before[mi:mj + 1]
+    if "reversed_segment" in move:
+
+        seg = list(move["reversed_segment"])
 
         pairs.append((
             "Efek pada Rute",
-            f"Potongan {route_text(segment, L)} dibalik "
-            f"menjadi {route_text(segment[::-1], L)}",
+            f"Potongan {route_text(seg, L)} dibalik "
+            f"menjadi {route_text(seg[::-1], L)}",
         ))
 
-        if reason:
-            pairs.append(("Alasan", reason))
+    elif "reconnection" in move:
+
+        meaning = RECONNECTION_TEXT.get(move["reconnection"], "")
+
+        pairs.append((
+            "Efek pada Rute",
+            f"Pola {move['reconnection']}"
+            + (f" ({meaning})" if meaning else ""),
+        ))
+
+    elif "swapped_cities" in move:
+
+        sc = move["swapped_cities"]
+
+        pairs.append((
+            "Efek pada Rute",
+            f"Kota {L[sc['posisi_i']]} dan {L[sc['posisi_j']]} "
+            "ditukar posisinya",
+        ))
+
+    chosen = next((c for c in candidates if c.get("selected")), None)
+
+    if move.get("aspiration_by_default"):
+
+        pairs.append((
+            "Alasan",
+            "Semua kandidat tabu dan tidak ada yang memenuhi aspirasi, "
+            "jadi dipilih move 'least tabu' (sisa tenure terkecil)",
+        ))
+
+    elif chosen is not None and chosen.get("is_tabu"):
+
+        pairs.append((
+            "Alasan",
+            "Move ini tabu, tetapi jaraknya lebih baik dari jarak terbaik "
+            f"sebelumnya ({_f(best_before)}), sehingga boleh dipilih "
+            "(aspirasi)",
+        ))
+
+    elif chosen is not None:
+
+        pairs.append((
+            "Alasan",
+            "Jarak terkecil di antara kandidat yang tidak tabu "
+            "(boleh lebih panjang dari rute sebelumnya)",
+        ))
 
     pairs.append(("Perubahan Jarak", _change(distance_before, item.get("distance"))))
 
@@ -2343,14 +2517,10 @@ def _tabu_view(history, k, dist, labels):
 
     # ---------------- kandidat ----------------
 
-    if candidates and ij is not None:
+    if candidates and spec is not None:
 
         rows = [
-            (
-                c["distance"],
-                bool(c.get("selected")) or (c["i"] == ij[0] and c["j"] == ij[1]),
-                c
-            )
+            (c["distance"], bool(c.get("selected")), c)
             for c in candidates
         ]
 
@@ -2358,19 +2528,26 @@ def _tabu_view(history, k, dist, labels):
 
         data = []
 
-        for _, chosen_flag, c in shown:
+        for _, flag, c in shown:
 
-            rem, add, new_route = two_opt_move(route_before, c["i"], c["j"])
+            rem = spec["broken_edges"](route_before, c)
+            add = spec["formed_edges"](route_before, c)
+
+            new_route = spec["apply"](route_before, spec["move_tuple"](c))
 
             data.append({
-                "Move": f"{_edges(rem, L)} → {_edges(add, L)}",
+                "Move": (
+                    f"{_edges(_pairs_of(rem - add), L)} → "
+                    f"{_edges(_pairs_of(add - rem), L)}"
+                ),
                 "Tour Baru": route_text(new_route, L),
                 "Jarak Total": _f(c["distance"]),
                 "Δ": _signed(c["distance"] - distance_before),
                 "Tabu?": "Ya" if c.get("is_tabu") else "Tidak",
+                "Sisa Tabu": c.get("tabu_remaining", 0),
                 "Aspirasi?": "Ya" if c.get("aspiration_met") else "Tidak",
                 "Boleh Dipilih?": "Ya" if c.get("admissible") else "Tidak",
-                "Dipilih": "✅" if chosen_flag else "",
+                "Dipilih": "✅" if flag else "",
             })
 
         blocks.append(_table(
@@ -2394,13 +2571,9 @@ def _tabu_view(history, k, dist, labels):
             "_Daftar kandidat tidak tersedia pada run ini._"
         ))
 
-    # ---------------- satu tabel tabu list ----------------
+    # ---------------- tabu list (1 edge = 1 baris) ----------------
 
-    new_attr = (
-        frozenset(frozenset(edge) for edge in added)
-        if added is not None
-        else None
-    )
+    new_edges = {frozenset(e) for e in added_pairs}
 
     active = {
         attr: expiry
@@ -2415,9 +2588,7 @@ def _tabu_view(history, k, dist, labels):
                 "Edge Dilarang Dibongkar": attr_text(attr, L),
                 "Berlaku Sampai Iterasi": int(expiry),
                 "Status": (
-                    "baru masuk"
-                    if new_attr is not None and attr == new_attr
-                    else "masih berlaku"
+                    "baru masuk" if attr in new_edges else "masih berlaku"
                 ),
             }
             for attr, expiry in active.items()
@@ -2479,37 +2650,25 @@ def _sa_view(history, k, dist, labels):
 
     pairs.append(("Rute Sebelumnya", route_text(route_before, L)))
 
-    ij = _move_ij(move)
-
     candidate_distance = None
 
-    if ij is not None and route_before is not None:
+    effect = (
+        sa_move_effect(route_before, move, L)
+        if route_before is not None and move.get("type")
+        else None
+    )
 
-        removed, added, _ = two_opt_move(route_before, ij[0], ij[1])
+    if effect is not None:
 
-        segment = route_before[ij[0]:ij[1] + 1]
+        removed, added, note = effect
 
         pairs.append((
             "Kandidat Move (acak)",
-            f"Hapus sambungan {_edges(removed, L)}, "
+            f"Operator {move['type']}: hapus sambungan {_edges(removed, L)}, "
             f"lalu sambung ulang {_edges(added, L)}",
         ))
 
-        pairs.append((
-            "Efek pada Rute",
-            f"Potongan {route_text(segment, L)} dibalik "
-            f"menjadi {route_text(segment[::-1], L)}",
-        ))
-
-    elif move.get("removed_edges") and move.get("added_edges"):
-
-        pairs.append((
-            "Kandidat Move (acak)",
-            "Hapus sambungan "
-            + _edges([e["edge"] for e in move["removed_edges"]], L)
-            + ", lalu sambung ulang "
-            + _edges([e["edge"] for e in move["added_edges"]], L),
-        ))
+        pairs.append(("Efek pada Rute", note))
 
     if delta is not None and distance_before is not None:
 
@@ -2522,11 +2681,11 @@ def _sa_view(history, k, dist, labels):
             f"{_signed(delta)}",
         ))
 
-        if float(delta) < 0:
+        if float(delta) <= 0:
 
             pairs.append((
                 "Peluang Diterima",
-                "100% (kandidat lebih pendek, pasti diterima)",
+                "100% (kandidat tidak lebih panjang, pasti diterima)",
             ))
 
         elif probability is not None and temperature is not None:
@@ -2751,12 +2910,11 @@ def build_iteration_table(kind, history, dist, labels):
 
                 row["Best so far"] = _f(best)
 
-                ij = _move_ij(move)
+                if k > 0 and move:
 
-                if k > 0 and ij is not None:
-
-                    rem, add, _ = two_opt_move(
-                        _route_of(history[k - 1]), ij[0], ij[1]
+                    rem, add = _net_edges(
+                        [e["edge"] for e in move.get("removed_edges", [])],
+                        [e["edge"] for e in move.get("added_edges", [])],
                     )
 
                     row["Move"] = f"{_edges(rem, labels)} → {_edges(add, labels)}"
@@ -2771,16 +2929,17 @@ def build_iteration_table(kind, history, dist, labels):
 
                 if k > 0:
 
-                    ij = _move_ij(move)
+                    effect = (
+                        sa_move_effect(_route_of(history[k - 1]), move, labels)
+                        if move.get("type")
+                        else None
+                    )
 
-                    if ij is not None:
-
-                        rem, add, _ = two_opt_move(
-                            _route_of(history[k - 1]), ij[0], ij[1]
-                        )
+                    if effect is not None:
 
                         row["Move"] = (
-                            f"{_edges(rem, labels)} → {_edges(add, labels)}"
+                            f"{_edges(effect[0], labels)} → "
+                            f"{_edges(effect[1], labels)}"
                         )
 
                     delta = _get(item, move, "delta")
@@ -2857,16 +3016,20 @@ ALGORITHM_EXPLANATIONS = {
         "Move yang lebih baik selalu diterima, sedangkan yang lebih buruk "
         "diterima dengan peluang exp(−Δ/T). Suhu T diturunkan bertahap "
         "sehingga algoritma makin selektif dan bisa keluar dari optimum "
-        "lokal.",
+        "lokal. Move acak dibuat dengan operator 2-opt, swap, atau "
+        "insertion; pencarian berhenti saat suhu mencapai minimum, "
+        "iterasi maksimum, atau konvergen.",
 
     "Tabu Search":
-        "Tabu Search mengevaluasi seluruh kandidat move 2-opt pada tiap "
+        "Tabu Search mengevaluasi seluruh kandidat move pada tiap "
         "iterasi, lalu memilih yang terbaik di antara yang tidak tabu "
         "(walau lebih buruk dari rute sekarang). Edge baru yang terbentuk "
         "dari move terpilih dimasukkan ke tabu list selama tabu tenure, "
         "sehingga move yang membongkarnya (undo) ditolak agar tidak "
         "berputar balik; move tabu tetap boleh dipilih bila lebih baik "
-        "dari rute terbaik (aspiration criterion).",
+        "dari rute terbaik (aspiration criterion). Neighborhood bisa "
+        "2-opt, 3-opt, atau swap; berhenti di iterasi maksimum atau saat "
+        "jarak terbaik tidak membaik selama patience iterasi.",
 }
 
 
@@ -2878,8 +3041,46 @@ DETAIL_NODE_LIMIT = 100
 # terlalu lama (1000 node = beberapa menit untuk SATU iterasi).
 THREE_OPT_MAX_NODES = 150
 
+# Tabu Search dengan neighborhood 3opt jauh lebih berat lagi
+# (semua kandidat dievaluasi tiap iterasi).
+TABU_3OPT_MAX_NODES = 60
+TABU_3OPT_VERBOSE_MAX_NODES = 12
+
 # Distance matrix hanya ditampilkan bila tidak terlalu besar
 DISTANCE_MATRIX_DISPLAY_LIMIT = 100
+
+
+def prepare_parameters(method, parameters, n_nodes):
+    """
+    Siapkan parameter akhir: batasi Tabu 3opt untuk dataset besar dan
+    atur verbose_history (menyimpan semua kandidat) sesuai ukuran data.
+    """
+
+    parameters = dict(parameters or {})
+
+    three_opt = (
+        method == "Tabu Search"
+        and parameters.get("move_type") == "3opt"
+    )
+
+    if three_opt and n_nodes > TABU_3OPT_MAX_NODES:
+
+        raise ValueError(
+            f"Tabu Search dengan 3opt terlalu berat untuk {n_nodes} node "
+            f"(batas {TABU_3OPT_MAX_NODES}). Gunakan 2opt atau swap."
+        )
+
+    if "verbose_history" in ALGORITHMS[method]["parameters"]:
+
+        limit = (
+            TABU_3OPT_VERBOSE_MAX_NODES
+            if three_opt
+            else DETAIL_NODE_LIMIT
+        )
+
+        parameters["verbose_history"] = n_nodes <= limit
+
+    return parameters
 
 
 # ------------------------------------------------------------
@@ -3063,10 +3264,6 @@ def render_independent_result(
     )
 
     # -------------------- 1. judul + penjelasan --------------------
-    # Nama algoritma dibuat lebih kecil (h3) dari judul "Results" (h2),
-    # dengan jarak di atasnya.
-
-    spacer(0.8)
 
     st.subheader(method)
 
@@ -3553,6 +3750,7 @@ def hybrid_report(df, dist_matrix, results, include_detail=False):
 
     return "\n".join(lines)
 
+
 def render_report_export(title, build, filename, key):
     """Expander berisi teks laporan + tombol salin (di kotak kode) + unduh."""
 
@@ -3583,6 +3781,7 @@ def render_report_export(title, build, filename, key):
             st.code(text, language="markdown", height=420)
         except TypeError:
             st.code(text, language="markdown")
+
 
 # ============================================================
 # RUN ALGORITHM
@@ -3641,7 +3840,7 @@ def run_algorithm(
         return two_opt(
             initial_route,
             dist_matrix,
-            max_iter=parameters.get("max_iter", 100),
+            max_iter=int(parameters.get("max_iter", 1000)),
             strategy=parameters.get("strategy", "best")
         )
 
@@ -3650,7 +3849,7 @@ def run_algorithm(
         return three_opt(
             initial_route,
             dist_matrix,
-            max_iter=parameters.get("max_iter", 100),
+            max_iter=int(parameters.get("max_iter", 1000)),
             strategy=parameters.get("strategy", "best")
         )
 
@@ -3661,29 +3860,23 @@ def run_algorithm(
 
     elif method == "Simulated Annealing":
 
+        convergence = (
+            parameters.get("stop_criterion", "max_iter") == "convergence"
+        )
+
         return simulated_annealing(
             dist_matrix,
             initial_route=initial_route,
-            initial_temp=parameters.get(
-                "initial_temp",
-                1000.0
+            initial_temp=parameters.get("initial_temp", 100.0),
+            cooling_rate=parameters.get("cooling_rate", 0.99),
+            min_temp=parameters.get("min_temp", 0.01),
+            max_iter=int(parameters.get("max_iter", 1000)),
+            iter_per_temp=int(parameters.get("iter_per_temp", 1)),
+            move_operator=parameters.get("move_operator", "2-opt"),
+            patience=(
+                int(parameters.get("patience", 200)) if convergence else None
             ),
-            cooling_rate=parameters.get(
-                "cooling_rate",
-                0.95
-            ),
-            min_temp=parameters.get(
-                "min_temp",
-                0.01
-            ),
-            max_iter=parameters.get(
-                "max_iter",
-                10
-            ),
-            seed=parameters.get(
-                "seed",
-                42
-            )
+            seed=int(parameters.get("seed", 42))
         )
 
 
@@ -3696,18 +3889,12 @@ def run_algorithm(
         return tabu_search(
             initial_route,
             dist_matrix,
-            max_iter=parameters.get(
-                "max_iter",
-                100
-            ),
-            tabu_tenure=parameters.get(
-                "tabu_tenure",
-                3
-            ),
-            verbose_history=parameters.get(
-                "verbose_history",
-                False
-            )
+            max_iter=int(parameters.get("max_iter", 1000)),
+            tabu_tenure=int(parameters.get("tabu_tenure", 5)),
+            move_type=parameters.get("move_type", "2opt"),
+            stop_criterion=parameters.get("stop_criterion", "convergence"),
+            patience=int(parameters.get("patience", 30)),
+            verbose_history=bool(parameters.get("verbose_history", False))
         )
 
     else:
@@ -4107,7 +4294,26 @@ def render_initial_panel(method, selected_algorithms, df):
 
 def render_parameter_panel(method, ns="independent"):
 
-    for parameter, config in ALGORITHMS[method]["parameters"].items():
+    params = ALGORITHMS[method]["parameters"]
+
+    for parameter, config in params.items():
+
+        # Parameter bersyarat (mis. patience hanya untuk convergence)
+        condition = config.get("show_if")
+
+        if condition:
+
+            dep_name, dep_value = condition
+
+            current = cfg_get(
+                method,
+                f"param_{dep_name}",
+                params[dep_name]["default"],
+                ns
+            )
+
+            if current != dep_value:
+                continue
 
         label = parameter.replace("_", " ").title()
 
@@ -4116,11 +4322,7 @@ def render_parameter_panel(method, ns="independent"):
         if config["type"] == "int":
 
             cfg_number(
-                method,
-                name,
-                label,
-                int(config["default"]),
-                ns=ns,
+                method, name, label, int(config["default"]), ns=ns,
                 min_value=int(config["min"]),
                 max_value=int(config["max"]),
                 step=int(config["step"]),
@@ -4130,38 +4332,26 @@ def render_parameter_panel(method, ns="independent"):
         elif config["type"] == "float":
 
             cfg_number(
-                method,
-                name,
-                label,
-                float(config["default"]),
-                ns=ns,
+                method, name, label, float(config["default"]), ns=ns,
                 min_value=float(config["min"]),
                 max_value=float(config["max"]),
                 step=float(config["step"]),
+                format=config.get("format"),
                 help=config["help"]
             )
 
         elif config["type"] == "select":
 
             cfg_selectbox(
-                method,
-                name,
-                label,
-                config["options"],
-                default=config["default"],
-                ns=ns,
-                help=config["help"]
+                method, name, label, config["options"],
+                default=config["default"], ns=ns, help=config["help"]
             )
 
         elif config["type"] == "bool":
 
             cfg_checkbox(
-                method,
-                name,
-                label,
-                config["default"],
-                ns=ns,
-                help=config["help"]
+                method, name, label, config["default"],
+                ns=ns, help=config["help"]
             )
 
 
@@ -4336,6 +4526,7 @@ def start_note_of(method, initial_solutions):
         return solution.get("note")
 
     return None
+
 
 # ============================================================
 # HYBRID
@@ -4629,16 +4820,11 @@ def render_hybrid(df, dist_matrix, ctx):
 
         def _parameters_of(method):
 
-            parameters = dict(parameters_all.get(method, {}))
-
-            if (
-                "verbose_history" in ALGORITHMS[method]["parameters"]
-                and len(df) <= DETAIL_NODE_LIMIT
-            ):
-
-                parameters["verbose_history"] = True
-
-            return parameters
+            return prepare_parameters(
+                method,
+                parameters_all.get(method, {}),
+                len(df)
+            )
 
         results = []
 
@@ -4701,8 +4887,6 @@ def render_hybrid(df, dist_matrix, ctx):
     st.divider()
 
     st.header("Results")
-
-    spacer(0.5)
 
     result_tabs = st.tabs([r["label"] for r in results])
 
@@ -5438,22 +5622,12 @@ with st.container():
                             "Starting Route belum lengkap."
                         )
 
-                    parameters = dict(
-                        algorithm_parameters.get(
-                            method,
-                            {}
-                        )
+                    # Batasi Tabu 3opt + atur verbose_history
+                    parameters = prepare_parameters(
+                        method,
+                        algorithm_parameters.get(method, {}),
+                        len(df)
                     )
-
-                    # Agar detail per iterasi (mis. semua kandidat
-                    # Tabu Search) tersedia untuk dataset kecil-menengah.
-                    if (
-                        "verbose_history"
-                        in ALGORITHMS[method]["parameters"]
-                        and len(df) <= DETAIL_NODE_LIMIT
-                    ):
-
-                        parameters["verbose_history"] = True
 
                     result = execute_independent_algorithm(
                         method=method,
@@ -5500,8 +5674,6 @@ with st.container():
             st.header(
                 "Results"
             )
-
-            spacer(0.5)
 
 
             for i, result in enumerate(results):
