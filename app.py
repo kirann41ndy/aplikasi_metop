@@ -1115,12 +1115,12 @@ ALGORITHMS = {
             "Mencari solusi dengan menerima beberapa solusi yang lebih buruk secara probabilistik.",
         "parameters": {
             "initial_temp": {
-                "type": "float", "default": 100.0, "min": 0.01,
-                "max": 100000.0, "step": 10.0,
-                "help": "Suhu awal. Sebaiknya sebanding dengan rata-rata jarak antar node."
+                "type": "float", "default": 5.0, "default_hybrid": 1.0, "min": 0.01,
+                "max": 100000.0, "step": 0.5, "format": "%.2f",
+                "help": "Suhu awal. Terlalu tinggi = rute awal yang bagus dirusak (Hybrid); terlalu rendah = SA tidak sempat keluar dari rute acak (Independent). Default Independent 5, Hybrid 1 (untuk skala data kecil; skala 0-100 naikkan sekitar 10x)."
             },
             "cooling_rate": {
-                "type": "float", "default": 0.99, "min": 0.01,
+                "type": "float", "default": 0.998, "default_hybrid": 0.995, "min": 0.01,
                 "max": 0.999, "step": 0.001, "format": "%.3f",
                 "help": "Faktor pengali suhu. Makin dekat 1, pendinginan makin lambat."
             },
@@ -1139,7 +1139,7 @@ ALGORITHMS = {
                 "help": "Jumlah langkah pada setiap level suhu."
             },
             "max_iter": {
-                "type": "int", "default": 1000, "min": 1, "max": 10000, "step": 1,
+                "type": "int", "default": 5000, "default_hybrid": 1000, "min": 1, "max": 10000, "step": 1,
                 "help": "Batas maksimum langkah."
             },
             "stop_criterion": {
@@ -3867,8 +3867,8 @@ def run_algorithm(
         return simulated_annealing(
             dist_matrix,
             initial_route=initial_route,
-            initial_temp=parameters.get("initial_temp", 100.0),
-            cooling_rate=parameters.get("cooling_rate", 0.99),
+            initial_temp=parameters.get("initial_temp", 5.0),
+            cooling_rate=parameters.get("cooling_rate", 0.998),
             min_temp=parameters.get("min_temp", 0.01),
             max_iter=int(parameters.get("max_iter", 1000)),
             iter_per_temp=int(parameters.get("iter_per_temp", 1)),
@@ -4292,6 +4292,15 @@ def render_initial_panel(method, selected_algorithms, df):
 # PANEL: PARAMETER (satu algoritma)
 # ------------------------------------------------------------
 
+def _dflt(config, ns="independent"):
+    """Default parameter; Hybrid boleh punya default sendiri (default_hybrid)."""
+
+    if ns == "hybrid" and "default_hybrid" in config:
+        return config["default_hybrid"]
+
+    return config["default"]
+
+
 def render_parameter_panel(method, ns="independent"):
 
     params = ALGORITHMS[method]["parameters"]
@@ -4308,7 +4317,7 @@ def render_parameter_panel(method, ns="independent"):
             current = cfg_get(
                 method,
                 f"param_{dep_name}",
-                params[dep_name]["default"],
+                _dflt(params[dep_name], ns),
                 ns
             )
 
@@ -4322,7 +4331,7 @@ def render_parameter_panel(method, ns="independent"):
         if config["type"] == "int":
 
             cfg_number(
-                method, name, label, int(config["default"]), ns=ns,
+                method, name, label, int(_dflt(config, ns)), ns=ns,
                 min_value=int(config["min"]),
                 max_value=int(config["max"]),
                 step=int(config["step"]),
@@ -4332,7 +4341,7 @@ def render_parameter_panel(method, ns="independent"):
         elif config["type"] == "float":
 
             cfg_number(
-                method, name, label, float(config["default"]), ns=ns,
+                method, name, label, float(_dflt(config, ns)), ns=ns,
                 min_value=float(config["min"]),
                 max_value=float(config["max"]),
                 step=float(config["step"]),
@@ -4344,13 +4353,13 @@ def render_parameter_panel(method, ns="independent"):
 
             cfg_selectbox(
                 method, name, label, config["options"],
-                default=config["default"], ns=ns, help=config["help"]
+                default=_dflt(config, ns), ns=ns, help=config["help"]
             )
 
         elif config["type"] == "bool":
 
             cfg_checkbox(
-                method, name, label, config["default"],
+                method, name, label, _dflt(config, ns),
                 ns=ns, help=config["help"]
             )
 
@@ -4497,7 +4506,7 @@ def build_algorithm_parameters(selected_algorithms, ns="independent"):
             parameter: cfg_get(
                 method,
                 f"param_{parameter}",
-                settings["default"],
+                _dflt(settings, ns),
                 ns
             )
             for parameter, settings in config.items()
